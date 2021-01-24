@@ -521,6 +521,7 @@ void
 transform(int key, char (*fn)(char))
 {
 	doc.data[key] = fn(doc.data[key]);
+	doc.unsaved = 1;
 	redraw(pixels);
 }
 
