@@ -545,6 +545,20 @@ selectoption(int option)
 }
 
 void
+selectcell(int x, int y)
+{
+	if(x == 4 || x == 9 || x == 14)
+		return;
+	if(x > 4)
+		x--;
+	if(x > 9)
+		x--;
+	if(x > 13)
+		x--;
+	select(x / 2, y + cursor.view);
+}
+
+void
 quit(void)
 {
 	free(pixels);
@@ -573,6 +587,9 @@ domouse(SDL_Event *event)
 			selectoption(event->motion.x / ZOOM / 8 - PAD);
 			return;
 		}
+		selectcell(
+			event->motion.x / ZOOM / 8 - PAD,
+			event->motion.y / ZOOM / 8 - PAD);
 		break;
 	case SDL_MOUSEMOTION:
 
