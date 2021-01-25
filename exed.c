@@ -521,6 +521,25 @@ opendoc(Document *d, char *name)
 	return 1;
 }
 
+int
+savetxt(Document *d, char *name)
+{
+	int i;
+	FILE *f = fopen("exed-output.c", "w");
+	fprintf(f, "{");
+	for(i = 0; i < SZ; ++i) {
+		if(i > 0 && i % 16 == 0)
+			fprintf(f, "},\n{");
+		fprintf(f, "0x%02x", doc.data[i]);
+		if(i % 16 < 15)
+			fprintf(f, ", ");
+	}
+	fprintf(f, "}");
+	fclose(f);
+	puts("Saved exed-output.c");
+	return 1;
+}
+
 void
 select(int x, int y)
 {
@@ -644,13 +663,14 @@ domouse(SDL_Event *event)
 void
 dokey(SDL_Event *event)
 {
+	int shift = SDL_GetModState() & KMOD_LSHIFT || SDL_GetModState() & KMOD_RSHIFT;
 	int ctrl = SDL_GetModState() & KMOD_LCTRL || SDL_GetModState() & KMOD_RCTRL;
 	if(ctrl) {
 		switch(event->key.keysym.sym) {
 		/* Generic */
 		case SDLK_n: makedoc(&doc, "untitled.chr"); break;
 		case SDLK_r: opendoc(&doc, doc.name); break;
-		case SDLK_s: savedoc(&doc, doc.name); break;
+		case SDLK_s: shift ? savetxt(&doc, doc.name) : savedoc(&doc, doc.name); break;
 		case SDLK_h: savemode(&GUIDES, !GUIDES); break;
 		case SDLK_UP: transform(cursor.i, doincr); break;
 		case SDLK_DOWN: transform(cursor.i, dodecr); break;
