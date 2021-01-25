@@ -370,8 +370,7 @@ drawchr(Uint32 *dst, int x, int y, int id)
 			int ch1 = doc.data[offset + v];
 			int ch2 = doc.data[offset + v + 8];
 			int clr = ((ch1 >> h) & 0x1) + (((ch2 >> h) & 0x1) << 1);
-			int guides = GUIDES && !clr && (x + y) % 2;
-			putpixel(dst, px - 1, py, guides ? 4 : clr);
+			putpixel(dst, px - 1, py, clr);
 		}
 }
 
@@ -390,12 +389,10 @@ void
 drawui(Uint32 *dst)
 {
 	int bottom = VER * 8 + 8;
-
 	drawicon(dst, 0 * 8, bottom, icons[3], 2, 0);
 	drawicon(dst, 1 * 8, bottom, icons[4], 2, 0);
 	drawicon(dst, 2 * 8, bottom, icons[5], 2, 0);
 	drawicon(dst, 3 * 8, bottom, icons[6], 2, 0);
-
 	drawicon(dst, 5 * 8, bottom, icons[GUIDES ? 12 : 11], GUIDES ? 1 : 2, 0);
 	drawicon(dst, (HOR - 1) * 8, bottom, icons[13], doc.unsaved ? 2 : 3, 0);
 }
@@ -416,7 +413,7 @@ redraw(Uint32 *dst)
 	int i;
 	clear(dst);
 	drawui(dst);
-	for(i = 0; i < 128; ++i) {
+	for(i = 0; i < VER * 8; ++i) {
 		int id = (cursor.view * 8) + i;
 		int x = (i % 8) * 2 + ((i % 8) / 2);
 		int y = i / 8;
@@ -429,10 +426,11 @@ redraw(Uint32 *dst)
 		drawicon(dst, (19 + (i % 8)) * 8 + 8, y * 8, c ? font[c] : icons[2], c ? 1 : 3, 0);
 		if(i % 8 == 0)
 			drawicon(dst, 29 * 8, y * 8, &doc.data[id], 1, 0);
-		if(i % 16 == 0)
+		if(i % 16 == 0) {
+			printf("%d\n", id / 16);
 			drawchr(dst, 31, y, id / 16);
+		}
 	}
-
 	SDL_UpdateTexture(gTexture, NULL, dst, WIDTH * sizeof(Uint32));
 	SDL_RenderClear(gRenderer);
 	SDL_RenderCopy(gRenderer, gTexture, NULL, NULL);
