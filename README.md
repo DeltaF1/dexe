@@ -29,11 +29,16 @@ To resume working on a tileset:
 
 ### General
 
-- `up` Move up
-- `down` Move down
-- `left` Move left
-- `right` Move right
+- `0-9a-f` Insert
+- `backspace` Erase
 - `ctrl+up` Increment
 - `ctrl+down` Decrement
 - `ctrl+left` Roll Right
 - `ctrl+right` Roll Left
+
+### Move
+
+- `up` Move up
+- `down` Move down
+- `left` Move left
+- `right` Move right

@@ -26,7 +26,7 @@ typedef struct {
 } Document;
 
 typedef struct Brush {
-	int x, y, i, view;
+	int x, y, i, swap, view;
 } Cursor;
 
 int WIDTH = 8 * HOR + 8 * PAD * 2;
@@ -315,6 +315,7 @@ Uint8 font[][8] = {
 	{0x00, 0x0e, 0x08, 0x08, 0x48, 0x28, 0x18, 0x00},
 	{0x00, 0x50, 0x68, 0x48, 0x48, 0x00, 0x00, 0x00},
 	{0x00, 0x60, 0x10, 0x20, 0x70, 0x00, 0x00, 0x00},
+	{0x00, 0x00, 0x3c, 0x3c, 0x3c, 0x3c, 0x00, 0x00},
 	{0x00, 0x00, 0x3c, 0x3c, 0x3c, 0x3c, 0x00, 0x00}};
 
 SDL_Window *gWindow;
@@ -503,9 +504,22 @@ select(int x, int y)
 	cursor.i = cursor.x % 8 + (cursor.y * 8);
 	if(cursor.y >= cursor.view + VER)
 		cursor.view = clamp(cursor.y - VER + 1, 0, SZ - 4);
-
 	if(cursor.y <= cursor.view)
 		cursor.view = clamp(cursor.y, 0, SZ - 4);
+	cursor.swap = 0;
+	redraw(pixels);
+}
+
+void
+insert(int v)
+{
+	if(!cursor.swap)
+		doc.data[cursor.i] = v * 16 + (doc.data[cursor.i] & 0xf);
+	else {
+		printf("before:%d -> after:%d\n", doc.data[cursor.i], doc.data[cursor.i] + v);
+		doc.data[cursor.i] = v;
+	}
+	cursor.swap = !cursor.swap;
 	redraw(pixels);
 }
 
@@ -624,9 +638,30 @@ dokey(SDL_Event *event)
 		case SDLK_RIGHT: select(cursor.x + 1, cursor.y); break;
 		case SDLK_PAGEUP: select(cursor.x, cursor.y - 16); break;
 		case SDLK_PAGEDOWN: select(cursor.x, cursor.y + 16); break;
+		case SDLK_BACKSPACE: insert(0); break;
 		}
 	}
 }
+
+void
+dotext(SDL_Event *event)
+{
+	int i;
+	if(SDL_GetModState() & KMOD_LCTRL || SDL_GetModState() & KMOD_RCTRL)
+		return;
+	for(i = 0; i < SDL_TEXTINPUTEVENT_TEXT_SIZE; ++i) {
+		char c = event->text.text[i];
+		if(c < ' ' || c > '~')
+			break;
+		if(c < '0' || c > 'f')
+			break;
+		if(c >= '0' && c <= '9')
+			insert(c - '0');
+		if(c >= 'a' && c <= 'f')
+			insert(c - 'a' + 10);
+	}
+}
+
 int
 init(void)
 {
@@ -661,8 +696,6 @@ int
 main(int argc, char **argv)
 {
 	int ticknext = 0;
-	cursor.x = 0;
-	cursor.y = 0;
 	if(!init())
 		return error("Init", "Failure");
 	if(argc > 1) {
@@ -670,6 +703,7 @@ main(int argc, char **argv)
 			makedoc(&doc, argv[1]);
 	} else
 		makedoc(&doc, "untitled.chr");
+	select(0, 0);
 	while(1) {
 		int tick = SDL_GetTicks();
 		SDL_Event event;
@@ -682,6 +716,7 @@ main(int argc, char **argv)
 			case SDL_MOUSEBUTTONUP:
 			case SDL_MOUSEBUTTONDOWN:
 			case SDL_MOUSEMOTION: domouse(&event); break;
+			case SDL_TEXTINPUT: dotext(&event); break;
 			case SDL_KEYDOWN: dokey(&event); break;
 			case SDL_WINDOWEVENT:
 				if(event.window.event == SDL_WINDOWEVENT_EXPOSED)
