@@ -31,7 +31,7 @@ typedef struct Brush {
 
 int WIDTH = 8 * HOR + 8 * PAD * 2;
 int HEIGHT = 8 * (VER + 2) + 8 * PAD * 2;
-int FPS = 30, GUIDES = 1, BIGPIXEL = 0, ZOOM = 2;
+int FPS = 30, GUIDES = 1, VIEWCHR = 1, ZOOM = 2;
 
 Document doc;
 Cursor cursor;
@@ -47,10 +47,10 @@ Uint8 icons[][8] = {
 	{0x38, 0x44, 0x82, 0x82, 0x82, 0x44, 0x38, 0x00}, /* color:blank */
 	{0x38, 0x7c, 0xfe, 0xfe, 0xfe, 0x7c, 0x38, 0x00}, /* color:full */
 	{0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00}, /* blank */
-	{0x00, 0x10, 0x28, 0x44, 0x10, 0x10, 0x00, 0x00}, /* incr */
-	{0x00, 0x10, 0x10, 0x44, 0x28, 0x10, 0x00, 0x00}, /* decr */
-	{0x00, 0x10, 0x48, 0x24, 0x48, 0x10, 0x00, 0x00}, /* ror */
-	{0x00, 0x10, 0x24, 0x48, 0x24, 0x10, 0x00, 0x00}, /* rol */
+	{0x7c, 0x82, 0x92, 0xba, 0x92, 0x82, 0x7c, 0x00}, /* incr */
+	{0x7c, 0x82, 0x82, 0xba, 0x82, 0x82, 0x7c, 0x00}, /* decr */
+	{0x1c, 0x22, 0x42, 0x84, 0x42, 0x22, 0x1c, 0x00}, /* ror */
+	{0x70, 0x88, 0x84, 0x42, 0x84, 0x88, 0x70, 0x00}, /* rol */
 	{0xaa, 0x00, 0xaa, 0x00, 0xaa, 0x00, 0xaa, 0x00}, /* view:grid */
 	{0xee, 0x92, 0x82, 0x54, 0x82, 0x92, 0xee, 0x00}, /* view:bigpixels */
 	{0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xe0, 0x10, 0x00}, /* clip:blank */
@@ -393,7 +393,8 @@ drawui(Uint32 *dst)
 	drawicon(dst, 1 * 8, bottom, icons[4], 2, 0);
 	drawicon(dst, 2 * 8, bottom, icons[5], 2, 0);
 	drawicon(dst, 3 * 8, bottom, icons[6], 2, 0);
-	drawicon(dst, 5 * 8, bottom, icons[GUIDES ? 12 : 11], GUIDES ? 1 : 2, 0);
+	drawicon(dst, 5 * 8, bottom, icons[VIEWCHR ? 8 : 7], VIEWCHR ? 1 : 2, 0);
+	drawicon(dst, 6 * 8, bottom, icons[GUIDES ? 12 : 11], GUIDES ? 1 : 2, 0);
 	drawicon(dst, (HOR - 1) * 8, bottom, icons[13], doc.unsaved ? 2 : 3, 0);
 }
 
@@ -408,11 +409,9 @@ gethexfont(int v)
 }
 
 void
-redraw(Uint32 *dst)
+drawdefault(Uint32 *dst)
 {
 	int i;
-	clear(dst);
-	drawui(dst);
 	for(i = 0; i < VER * 8; ++i) {
 		int id = (cursor.view * 8) + i;
 		int x = (i % 8) * 2 + ((i % 8) / 2);
@@ -421,16 +420,44 @@ redraw(Uint32 *dst)
 		int b = gethexfont(doc.data[id] & 0xf);
 		int c = doc.data[id];
 		int sel = cursor.i == id;
-		drawicon(dst, x * 8, y * 8, font[a], sel ? 0 : 1, sel ? 2 : 0);
-		drawicon(dst, x * 8 + 8, y * 8, font[b], sel ? 0 : 1, sel ? 2 : 0);
+		int linesel = GUIDES && cursor.y - cursor.view == y;
+		drawicon(dst, x * 8, y * 8, font[a], sel ? 0 : linesel + 1, sel ? 2 : 0);
+		drawicon(dst, x * 8 + 8, y * 8, font[b], sel ? 0 : linesel + 1, sel ? 2 : 0);
 		drawicon(dst, (19 + (i % 8)) * 8 + 8, y * 8, c ? font[c] : icons[2], c ? 1 : 3, 0);
 		if(i % 8 == 0)
 			drawicon(dst, 29 * 8, y * 8, &doc.data[id], 1, 0);
-		if(i % 16 == 0) {
-			printf("%d\n", id / 16);
+		if(i % 16 == 0)
 			drawchr(dst, 31, y, id / 16);
-		}
 	}
+}
+
+void
+drawalternate(Uint32 *dst)
+{
+	int i;
+	for(i = 0; i < VER * 8; ++i) {
+		int id = (cursor.view * 8) + i;
+		int x = (i % 8) * 2 + (i % 8);
+		int y = i / 8;
+		int a = gethexfont(doc.data[id] >> 4 & 0xf);
+		int b = gethexfont(doc.data[id] & 0xf);
+		int c = doc.data[id];
+		int sel = cursor.i == id;
+		drawicon(dst, x * 8, y * 8, font[a], sel ? 0 : 1, sel ? 2 : 0);
+		drawicon(dst, x * 8 + 8, y * 8, font[b], sel ? 0 : 1, sel ? 2 : 0);
+		drawicon(dst, (23 + (i % 8)) * 8 + 8, y * 8, c ? font[c] : icons[2], c ? 1 : 3, 0);
+	}
+}
+
+void
+redraw(Uint32 *dst)
+{
+	clear(dst);
+	if(VIEWCHR)
+		drawdefault(dst);
+	else
+		drawalternate(dst);
+	drawui(dst);
 	SDL_UpdateTexture(gTexture, NULL, dst, WIDTH * sizeof(Uint32));
 	SDL_RenderClear(gRenderer);
 	SDL_RenderCopy(gRenderer, gTexture, NULL, NULL);
@@ -553,7 +580,8 @@ selectoption(int option)
 		doc.data[cursor.i] = doc.data[cursor.i] >> 2;
 		redraw(pixels);
 		break;
-	case 5: savemode(&GUIDES, !GUIDES); break;
+	case 5: savemode(&VIEWCHR, !VIEWCHR); break;
+	case 6: savemode(&GUIDES, !GUIDES); break;
 	case HOR - 1: savedoc(&doc, doc.name); break;
 	}
 }
@@ -561,15 +589,19 @@ selectoption(int option)
 void
 selectcell(int x, int y)
 {
-	if(x == 4 || x == 9 || x == 14)
-		return;
-	if(x > 4)
-		x--;
-	if(x > 9)
-		x--;
-	if(x > 13)
-		x--;
-	select(x / 2, y + cursor.view);
+	if(GUIDES) {
+		if(x == 4 || x == 9 || x == 14)
+			return;
+		if(x > 4)
+			x--;
+		if(x > 9)
+			x--;
+		if(x > 13)
+			x--;
+		x /= 2;
+	} else
+		x /= 3;
+	select(x, y + cursor.view);
 }
 
 void
@@ -591,8 +623,6 @@ quit(void)
 void
 domouse(SDL_Event *event)
 {
-	int ctrl = SDL_GetModState() & KMOD_LCTRL || SDL_GetModState() & KMOD_RCTRL;
-
 	switch(event->type) {
 	case SDL_MOUSEBUTTONUP:
 		break;
@@ -614,7 +644,6 @@ domouse(SDL_Event *event)
 void
 dokey(SDL_Event *event)
 {
-	int shift = SDL_GetModState() & KMOD_LSHIFT || SDL_GetModState() & KMOD_RSHIFT;
 	int ctrl = SDL_GetModState() & KMOD_LCTRL || SDL_GetModState() & KMOD_RCTRL;
 	if(ctrl) {
 		switch(event->key.keysym.sym) {
