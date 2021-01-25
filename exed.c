@@ -515,10 +515,8 @@ insert(int v)
 {
 	if(!cursor.swap)
 		doc.data[cursor.i] = v * 16 + (doc.data[cursor.i] & 0xf);
-	else {
-		printf("before:%d -> after:%d\n", doc.data[cursor.i], doc.data[cursor.i] + v);
-		doc.data[cursor.i] = v;
-	}
+	else
+		doc.data[cursor.i] = (doc.data[cursor.i] / 16 * 16) + v;
 	cursor.swap = !cursor.swap;
 	redraw(pixels);
 }
