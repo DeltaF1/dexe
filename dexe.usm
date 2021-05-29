@@ -97,24 +97,30 @@ BRK
 
 	;draw-scrollbar JSR2
 
-
+	( selection )
 	.Screen/height DEI2 #0008 -- .Screen/y DEO2
 	#0000 .Screen/x DEO2
-
 	.selection/from LDZ2 #22 ;draw-short JSR2
-
-	#0020 .Screen/x DEO2
-
+	#001f .Screen/x DEO2
 	.selection/to LDZ2 #22 ;draw-short JSR2
 
-
+	( 1-bit )
+	#0040 .Screen/x DEO2
+	.selection/from LDZ2 #44 SFT2 ;MEMORY ++ .Screen/addr DEO2
+	#21 .Screen/color DEO
+	#0048 .Screen/x DEO2
+	.selection/from LDZ2 #44 SFT2 ;MEMORY ++ #0010 ++ .Screen/addr DEO2
+	#21 .Screen/color DEO
+	( 2-bit )
 	#0050 .Screen/x DEO2
+	.selection/from LDZ2 #44 SFT2 ;MEMORY ++ .Screen/addr DEO2
+	#41 .Screen/color DEO
+
+	( path )
+	#005c .Screen/x DEO2
 	#21 ;draw-filepath JSR2
 
-	( draw selected line number )
-	( draw selection range )
 	( draw filesize )
-
 	.Screen/width DEI2 #0008 -- .Screen/x DEO2
 	;save-icn .Screen/addr DEO2
 	#21 .Screen/color DEO
@@ -324,7 +330,7 @@ RTN
 
 RTN
 
-@untitled-txt  "README.md $1
+@untitled-txt  "example.chr $1
 @blank-txt     "blank.chr $1
 @save-icn      1054 28c6 2854 1000 
 @make-icn      fe82 8282 848a f400 
