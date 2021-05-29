@@ -1,13 +1,8 @@
 (
 	app/dexe : hex editor
 	
-	right-click - erase
-	alt-click - drag canvas
-	arrows - move zoom
-	space - toogle zoom
-	tab - invert image
-	backspace - blank canvas
-	1-8 - select brush size
+	TODO:
+		scroll
 )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
@@ -41,6 +36,7 @@
 @selection
 	&from $2
 	&to $2
+	&scroll $2
 @path 
 	&length $1
 	&name $20
@@ -72,6 +68,12 @@ BRK
 	
 	;draw-cursor JSR2
 
+	.Mouse/state DEI #00 ! #01 JCN [ BRK ]
+
+	.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 DUP2 .selection/from STZ2 .selection/to STZ2
+
+	;redraw JSR2
+
 BRK
 
 @on-button ( -> )
@@ -81,6 +83,8 @@ BRK
 @redraw ( -- )
 	
 	( display selection )
+
+	#0000 .Screen/y DEO2
 	;font-hex .Screen/addr DEO2
 	#0000 .Screen/height DEI2 #0018 --
 	&loop
@@ -92,6 +96,19 @@ BRK
 	POP2 POP2
 
 	;draw-scrollbar JSR2
+
+
+	.Screen/height DEI2 #0008 -- .Screen/y DEO2
+	#0000 .Screen/x DEO2
+
+	.selection/from LDZ2 #22 ;draw-short JSR2
+
+	#0020 .Screen/x DEO2
+
+	.selection/to LDZ2 #22 ;draw-short JSR2
+
+
+	#0050 .Screen/x DEO2
 	#21 ;draw-filepath JSR2
 
 	( draw selected line number )
@@ -125,8 +142,8 @@ RTN
 		STH2kr LDA #0f AND TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
 		#21 [ STH2kr ;is-selected JSR2 #07 * ] + .Screen/color DEO
 		.Screen/x DEI2 #0007 ++ .Screen/x DEO2
-
 		POP2r
+
 		( jump after a short )
 		OVR #01 AND #00 = ,&no-leap JCN
 			.Screen/x DEI2 #0003 ++ .Screen/x DEO2
@@ -139,11 +156,13 @@ RTN
 	( ascii )
 	#00 #10
 	&ascii-loop
-		OVR TOS STH2kr ++ LDA
+		OVR TOS STH2kr ++ STH2k
+		LDA
 		#20 - 
 		TOS 8**
 		;font ++ .Screen/addr DEO2 
-		#21 .Screen/color DEO
+		#21 [ STH2kr ;is-selected JSR2 #0b * ] + .Screen/color DEO
+		POP2r
 		.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 		INCR
 		LTHk ,&ascii-loop JCN
@@ -156,7 +175,14 @@ RTN
 @is-selected ( addr* -- flag )
 	
 	;MEMORY --
-	STH2k .selection/from LDZ2 >> 
+	 
+	DUP2 .selection/from LDZ2 !! ,&continue JCN
+		POP2 #01 RTN
+	&continue 
+
+	STH2k
+
+	.selection/from LDZ2 #0001 -- >> 
 	STH2r .selection/to LDZ2 << 
 	#0101 ==
 
@@ -227,6 +253,25 @@ RTN
 
 RTN
 
+@get-cell ( x* y* -- addr* )
+
+	( get row ) 8// #0010 ** SWP2
+
+
+	DUP2 #00f8 << ,&byte JCN
+
+		POP2
+		RTN
+
+	&byte
+
+	DUP2 #001b // #0003 ** --
+
+	#0007 // #0002 //
+
+	++ 
+
+RTN
 
 @new-file ( default* -- )
 	
@@ -264,7 +309,6 @@ RTN
 @draw-filepath ( color -- )
 	
 	STH
-	#0000 .Screen/x DEO2
 	.Screen/height DEI2 #0008 -- .Screen/y DEO2
 	;path/name
 	&loop
@@ -280,7 +324,7 @@ RTN
 
 RTN
 
-@untitled-txt  "example.chr $1
+@untitled-txt  "README.md $1
 @blank-txt     "blank.chr $1
 @save-icn      1054 28c6 2854 1000 
 @make-icn      fe82 8282 848a f400 
