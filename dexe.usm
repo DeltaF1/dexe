@@ -3,6 +3,13 @@
 	
 	TODO:
 		scroll
+		center frame
+		follow cursor
+		erase
+		copy
+		insert
+		paste
+		don't overdraw past end of file
 )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
@@ -32,7 +39,10 @@
 
 @color  $1 
 @scroll [ &x $2 &y $2 ]
-@pointer   [ &x $2 &y $2 ]
+@pointer
+	&x $2 
+	&y $2
+	&last $1
 @selection
 	&from $2
 	&to $2
@@ -46,15 +56,17 @@
 |0100
 	
 	( theme )
-	#0f7e .System/r DEO2 
-	#0fc3 .System/g DEO2 
-	#0f93 .System/b DEO2
+	#0f77 .System/r DEO2 
+	#0fc7 .System/g DEO2 
+	#0f97 .System/b DEO2
 
 	( vectors ) 
 	;on-button .Controller/vector DEO2
 	;on-mouse .Mouse/vector DEO2
 
 	;untitled-txt ;new-file JSR2
+
+	.File/success DEI2 ;MEMORY-LEN STA2
 
 	( select )
 
@@ -64,13 +76,20 @@
 
 BRK
 
+
 @on-mouse ( -> )
 	
 	;draw-cursor JSR2
 
-	.Mouse/state DEI #00 ! #01 JCN [ BRK ]
 
-	.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 DUP2 .selection/from STZ2 .selection/to STZ2
+	( on mouse-down )
+	.Mouse/state DEI #00 > .pointer/last LDZ #0100 !! ,&no-mouse-down JCN
+		.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 .selection/from STZ2
+	&no-mouse-down
+
+	.Mouse/state DEI DUP .pointer/last STZ #01 JCN [ BRK ]
+
+	.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 .selection/to STZ2
 
 	;redraw JSR2
 
@@ -117,9 +136,9 @@ BRK
 	( selection )
 	.Screen/height DEI2 #0008 -- .Screen/y DEO2
 	#0000 .Screen/x DEO2
-	.selection/from LDZ2 #22 ;draw-short JSR2
+	.selection/to LDZ2 #22 .selection/from LDZ2 .selection/to LDZ2 == - ;draw-short JSR2
 	#0028 .Screen/x DEO2
-	.selection/to LDZ2 #22 ;draw-short JSR2
+	;MEMORY-LEN LDA2 #23 ;draw-short JSR2
 
 	( path )
 	#0050 .Screen/x DEO2
@@ -142,43 +161,13 @@ RTN
 	
 	STH2
 
-	( bytes )
-	#00 #08
-	&byte-loop
-		OVR TOS STH2kr ++ STH2k
-		LDA #04 SFT TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
-		#21 [ STH2kr ;is-selected JSR2 #07 * ] + .Screen/color DEO
-		.Screen/x DEI2 #0008 ++ .Screen/x DEO2
-		STH2kr LDA #0f AND TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
-		#21 [ STH2kr ;is-selected JSR2 #07 * ] + .Screen/color DEO
-		.Screen/x DEI2 #0008 ++ .Screen/x DEO2
-		POP2r
-		( jump after a short )
-		OVR #01 AND #00 = ,&no-leap JCN
-			.Screen/x DEI2 #0008 ++ .Screen/x DEO2 &no-leap
-		INCR
-		LTHk ,&byte-loop JCN
-	POP2
-
-	( ascii )
-	#00 #08
-	&ascii-loop
-		OVR TOS STH2kr ++ STH2k
-		LDA
-		#20 - 
-		TOS 8**
-		;font ++ .Screen/addr DEO2 
-		#21 [ STH2kr ;is-selected JSR2 #0b * ] + .Screen/color DEO
-		POP2r
-		.Screen/x DEI2 #0008 ++ .Screen/x DEO2
-		INCR
-		LTHk ,&ascii-loop JCN
-	POP2
+	STH2kr ;draw-bytes JSR2
+	STH2kr ;draw-ascii JSR2
 
 	( icn )
 	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 	STH2kr .Screen/addr DEO2
-	#21 .Screen/color DEO
+	STH2kr #0008 // #0001 AND2 #0001 == #22 + .Screen/color DEO
 
 	( chr )
 	STH2kr #0008 // #0001 AND2 #0000 == ,&no-chr JCN
@@ -191,14 +180,75 @@ RTN
 
 RTN
 
+@draw-bytes ( addr* -- )
+	
+	STH2
+	#00 #08
+	&byte-loop
+		OVR TOS STH2kr ++ STH2
+
+		( is end of file )
+		STH2kr ;MEMORY -- ;MEMORY-LEN LDA2 << ,&within-file JCN
+			;font-hex .Screen/addr DEO2
+			#23 .Screen/color DEO
+			.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+			#23 .Screen/color DEO
+			.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+			,&resume JMP
+		&within-file
+			STH2kr LDA #04 SFT TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+			#21 [ STH2kr ;is-selected JSR2 #07 * ] + .Screen/color DEO
+			.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+			STH2kr LDA #0f AND TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+			#21 [ STH2kr ;is-selected JSR2 #07 * ] + .Screen/color DEO
+			.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+		&resume
+		POP2r
+
+		( jump after a short )
+		OVR #01 AND #00 = ,&no-leap JCN
+			.Screen/x DEI2 #0008 ++ .Screen/x DEO2 &no-leap
+		INCR
+		LTHk ;&byte-loop JCN2
+	POP2
+
+	POP2r
+
+RTN
+
+@draw-ascii ( addr* -- )
+	
+	STH2
+	#00 #08
+	&ascii-loop
+		OVR TOS STH2kr ++ STH2
+
+		( is end of file )
+		STH2kr ;MEMORY -- ;MEMORY-LEN LDA2 << ,&within-file JCN
+			;font #2e TOS 8** ++ .Screen/addr DEO2 
+			#23 .Screen/color DEO
+			,&resume JMP
+		&within-file
+			STH2kr LDA #20 - TOS 8** ;font ++ .Screen/addr DEO2 
+			#21 [ STH2kr ;is-selected JSR2 #0b * ] + .Screen/color DEO
+		&resume
+		POP2r
+		.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+		INCR
+		LTHk ,&ascii-loop JCN
+	POP2
+	POP2r
+
+RTN
+
 @is-selected ( addr* -- flag )
 	
 	;MEMORY --
 	 
-	DUP2 .selection/from LDZ2 !! ,&continue JCN
-		POP2 #01 RTN
-	&continue 
-
+	DUP2 .selection/from LDZ2 !! ,&no-from JCN
+		POP2 #01 RTN &no-from 
+	DUP2 .selection/to LDZ2 !! ,&no-to JCN
+		POP2 #01 RTN &no-to 
 	STH2k
 
 	.selection/from LDZ2 #0001 -- >> 
@@ -253,7 +303,7 @@ RTN
 
 	#0008 .Screen/height DEI2 #0018 --
 	&loop
-		( draw ) #22 .Screen/color DEO
+		( draw ) #23 .Screen/color DEO
 		( incr ) SWP2 #0008 ++ DUP2 .Screen/y DEO2 SWP2
 		OVR2 OVR2 LTH2 ,&loop JCN
 	POP2 POP2
@@ -264,11 +314,11 @@ RTN
 
 	#0000 .Screen/y DEO2
 	DUP2 #0010 ++ .Screen/addr DEO2
-	( draw ) #22 .Screen/color DEO
+	( draw ) #23 .Screen/color DEO
 
 	.Screen/height DEI2 #0018 -- .Screen/y DEO2
 	#0018 ++ .Screen/addr DEO2
-	( draw ) #22 .Screen/color DEO
+	( draw ) #23 .Screen/color DEO
 
 RTN
 
@@ -487,5 +537,6 @@ RTN
 	0050 6848 4800 0000 0060 1020 7000 0000
 	0000 3c3c 3c3c 0000 0000 3c3c 3c3c 0000
 
+@MEMORY-LEN $2
 
 @MEMORY
