@@ -25,6 +25,7 @@
 %INCR { SWP #01 + SWP }
 %DEBUG  { .Console/byte DEO #0a .Console/char DEO }
 %DEBUG2 { .Console/short DEO2 #0a .Console/char DEO }
+%RELEASE-MOUSE { #00 .Mouse/state DEO }
 
 ( devices )
 
@@ -39,8 +40,6 @@
 
 |0000
 
-@color  $1 
-@scroll [ &x $2 &y $2 ]
 @pointer
 	&x $2 
 	&y $2
@@ -78,9 +77,11 @@ BRK
 	
 	;draw-cursor JSR2
 
+	.Mouse/state DEI #00 ! .Mouse/x DEI2 .Screen/width DEI2 #0008 -- >> #0101 == ;on-touch-scrollbar JCN2
+
 	( on mouse-down )
 	.Mouse/state DEI #00 > .pointer/last LDZ #0100 !! ,&no-mouse-down JCN
-		.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 .selection/from STZ2
+		.Mouse/x DEI2 .Mouse/y DEI2 .selection/scroll LDZ2 #0008 ** ++ ;get-cell JSR2 .selection/from STZ2
 	&no-mouse-down
 
 	( on scroll up )
@@ -99,9 +100,7 @@ BRK
 
 	.Mouse/state DEI DUP .pointer/last STZ #01 JCN [ BRK ]
 
-	.Mouse/x DEI2 .Screen/width DEI2 #0008 -- >> ;on-touch-scrollbar JCN2
-
-	.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 
+	.Mouse/x DEI2 .Mouse/y DEI2 .selection/scroll LDZ2 #0008 ** ++ ;get-cell JSR2 
 
 	( clamp )
 	DUP2 ;MEMORY-LEN LDA2 STH2k << ,&no-clamp JCN
@@ -114,7 +113,16 @@ BRK
 
 @on-touch-scrollbar ( -> )
 	
-	#aa DEBUG
+	.Mouse/y DEI2 8// 
+	DUP #00 ! ,&no-up JCN
+		( clamp ) .selection/scroll LDZ2 #0000 == ,&no-up JCN
+		.selection/scroll LDZ2 #0001 -- .selection/scroll STZ2
+		;redraw JSR2 POP RELEASE-MOUSE BRK &no-up
+	DUP .Screen/height DEI2 8// TOB #03 - ! ,&no-down JCN
+		( clamp ) ( TODO )
+		.selection/scroll LDZ2 #0001 ++ .selection/scroll STZ2
+		;redraw JSR2 POP RELEASE-MOUSE BRK &no-down
+	POP
 
 BRK
 
@@ -142,18 +150,21 @@ BRK
 
 @redraw ( -- )
 	
-	( display selection )
+	( offset )
+	;MEMORY .selection/scroll LDZ2 #0008 ** ++ STH2
 
+	( draw lines )
 	#0000 .Screen/y DEO2
 	;font-hex .Screen/addr DEO2
 	#0000 .Screen/height DEI2 #0010 --
 	&loop
 		#0000 .Screen/x DEO2
-		OVR2 ;MEMORY ++ ;draw-line JSR2
+		OVR2 STH2kr ++ ;draw-line JSR2
 		SWP2 #0008 ++ SWP2
 		OVR2 .Screen/y DEO2
 		LTH2k ,&loop JCN
 	POP2 POP2
+	POP2r
 
 	;draw-scrollbar JSR2
 
@@ -332,7 +343,7 @@ RTN
 		OVR2 OVR2 LTH2 ,&loop JCN
 	POP2 POP2
 
-	.scroll/y LDZ2 #0008 ++ .Screen/y DEO2
+	.selection/scroll LDZ2 #0008 ++ .Screen/y DEO2
 	DUP2 #0008 ++ .Screen/addr DEO2
 	( draw ) #21 .Screen/color DEO
 
