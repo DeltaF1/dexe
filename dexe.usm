@@ -2,14 +2,16 @@
 	app/dexe : hex editor
 	
 	TODO:
-		scroll
 		center frame
 		follow cursor
 		erase
 		copy
 		insert
 		paste
-		don't overdraw past end of file
+		save
+		load
+		rename
+		blank
 )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
@@ -68,14 +70,9 @@
 
 	.File/success DEI2 ;MEMORY-LEN STA2
 
-	( select )
-
-	#0021 .selection/from STZ2
-	#0039 .selection/to STZ2
 	;redraw JSR2
 
 BRK
-
 
 @on-mouse ( -> )
 	
@@ -86,13 +83,14 @@ BRK
 		.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 .selection/from STZ2
 	&no-mouse-down
 
-	( on scroll )
+	( on scroll up )
 	.Mouse/wheel DEI #01 ! ,&no-scroll-up JCN
 		( clamp ) .selection/from LDZ2 #0008 << ,&no-scroll-up JCN
 		( move ) .selection/from LDZ2 #0008 -- DUP2 .selection/from STZ2 .selection/to STZ2
 		;redraw JSR2 BRK
 	&no-scroll-up
 
+	( on scroll down )
 	.Mouse/wheel DEI #ff ! ,&no-scroll-down JCN
 		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0008 -- >> ,&no-scroll-down JCN
 		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2
@@ -100,6 +98,8 @@ BRK
 	&no-scroll-down
 
 	.Mouse/state DEI DUP .pointer/last STZ #01 JCN [ BRK ]
+
+	.Mouse/x DEI2 .Screen/width DEI2 #0008 -- >> ;on-touch-scrollbar JCN2
 
 	.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 
 
@@ -109,6 +109,12 @@ BRK
 	.selection/to STZ2
 
 	;redraw JSR2
+
+BRK
+
+@on-touch-scrollbar ( -> )
+	
+	#aa DEBUG
 
 BRK
 
