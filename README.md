@@ -1,21 +1,13 @@
-# Exed
+# Dexe
 
 A minimal hex editor, written in ANSI C.
 
 ## Build
 
-To build exed, you must have [SDL2](https://wiki.libsdl.org/).
+You must have the [Uxn](https://git.sr.ht/~rabbits/uxn/) assembler and emulator.
 
 ```
-cc exed.c -std=c89 -Os -DNDEBUG -g0 -s -Wall -L/usr/local/lib -lSDL2 -o exed
-```
-
-## I/O
-
-To resume working on a tileset:
-
-```
-./exed example.chr
+uxnasm noodle.usm noodle.rom && uxnemu noodle.rom
 ```
 
 ## Controls
