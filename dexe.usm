@@ -30,7 +30,7 @@
 |10 @Console    [ &vector $2 &pad     $6 &char   $1 &byte  $1 &short $2 &string $2 ]
 |20 @Screen     [ &vector $2 &width   $2 &height $2 &pad   $2 &x     $2 &y $2 &addr $2 &color $1 ]
 |80 @Controller [ &vector $2 &button  $1 &key    $1 ]
-|90 @Mouse      [ &vector $2 &x       $2 &y      $2 &state $1 &chord $1 ]
+|90 @Mouse      [ &vector $2 &x       $2 &y      $2 &state $1 &wheel $1 ]
 |a0 @File       [ &vector $2 &success $2 &offset $2 &pad   $2 &name  $2 &length $2 &load $2 &save $2 ]
 
 ( variables )
@@ -81,15 +81,32 @@ BRK
 	
 	;draw-cursor JSR2
 
-
 	( on mouse-down )
 	.Mouse/state DEI #00 > .pointer/last LDZ #0100 !! ,&no-mouse-down JCN
 		.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 .selection/from STZ2
 	&no-mouse-down
 
+	( on scroll )
+	.Mouse/wheel DEI #01 ! ,&no-scroll-up JCN
+		( clamp ) .selection/from LDZ2 #0008 << ,&no-scroll-up JCN
+		( move ) .selection/from LDZ2 #0008 -- DUP2 .selection/from STZ2 .selection/to STZ2
+		;redraw JSR2 BRK
+	&no-scroll-up
+
+	.Mouse/wheel DEI #ff ! ,&no-scroll-down JCN
+		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0008 -- >> ,&no-scroll-down JCN
+		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2
+		;redraw JSR2 BRK
+	&no-scroll-down
+
 	.Mouse/state DEI DUP .pointer/last STZ #01 JCN [ BRK ]
 
-	.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 .selection/to STZ2
+	.Mouse/x DEI2 .Mouse/y DEI2 ;get-cell JSR2 
+
+	( clamp )
+	DUP2 ;MEMORY-LEN LDA2 STH2k << ,&no-clamp JCN
+		POP2 STH2kr #0001 -- &no-clamp POP2r
+	.selection/to STZ2
 
 	;redraw JSR2
 
@@ -102,13 +119,14 @@ BRK
 		( clamp ) .selection/from LDZ2 #0008 << ,&no-up JCN
 		( move ) .selection/from LDZ2 #0008 -- DUP2 .selection/from STZ2 .selection/to STZ2 &no-up
 	DUP #05 SFT #01 AND #01 ! ,&no-down JCN
-		( TODO: clamp at file length )
+		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0008 -- >> ,&no-down JCN
 		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2 &no-down
 	DUP #06 SFT #01 AND #01 ! ,&no-left JCN
 		( clamp ) .selection/from LDZ2 #0007 AND2 #0000 == ,&no-left JCN
 		( move ) .selection/from LDZ2 #0001 -- DUP2 .selection/from STZ2 .selection/to STZ2 &no-left
 	DUP #07 SFT #01 AND #01 ! ,&no-right JCN
 		( clamp ) .selection/from LDZ2 #0007 AND2 #0007 == ,&no-right JCN
+		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0001 -- == ,&no-right JCN
 		( move ) .selection/from LDZ2 #0001 ++ DUP2 .selection/from STZ2 .selection/to STZ2 &no-right
 	#00 = #04 JCN 
 
@@ -251,7 +269,7 @@ RTN
 		POP2 #01 RTN &no-to 
 	STH2k
 
-	.selection/from LDZ2 #0001 -- >> 
+	.selection/from LDZ2 >> 
 	STH2r .selection/to LDZ2 << 
 	#0101 ==
 
