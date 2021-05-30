@@ -2,10 +2,11 @@
 	app/dexe : hex editor
 	
 	TODO:
-		follow cursor
 		copy
 		paste
 		rename
+		touch scrollbar
+		clamp position on delete
 )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
@@ -156,10 +157,12 @@ BRK
 	DUP #04 SFT #01 AND #01 ! ,&no-up JCN
 		( clamp ) .selection/from LDZ2 #0008 << ,&no-up JCN
 		( move ) .selection/from LDZ2 #0008 -- DUP2 .selection/from STZ2 .selection/to STZ2 
+		;follow JSR2
 		#00 .selection/nibble STZ &no-up
 	DUP #05 SFT #01 AND #01 ! ,&no-down JCN
 		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0008 -- >> ,&no-down JCN
 		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2 
+		;follow JSR2
 		#00 .selection/nibble STZ &no-down
 	DUP #06 SFT #01 AND #01 ! ,&no-left JCN
 		( clamp ) .selection/from LDZ2 #0007 AND2 #0000 == ,&no-left JCN
@@ -174,12 +177,13 @@ BRK
 
 	.Controller/key DEI
 	DUP #0d ! ,&no-enter JCN
-		.selection/from LDZ2 ;MEMORY ++ ;shift-memory-right JSR2
-		;MEMORY-LEN LDA2 #0001 ++ ;MEMORY-LEN STA2
-		#00 .selection/from LDZ2 ;MEMORY ++ STA &no-enter
+		.selection/to LDZ2 .selection/from LDZ2 -- #0001 ++ STH2
+		.selection/from LDZ2 ;MEMORY ++ STH2kr ;shift-memory-right JSR2
+		;MEMORY-LEN LDA2 STH2r ++ ;MEMORY-LEN STA2 &no-enter
 	DUP #08 ! ,&no-backspace JCN
-		.selection/from LDZ2 ;MEMORY ++ ;shift-memory-left JSR2
-		;MEMORY-LEN LDA2 #0001 -- ;MEMORY-LEN STA2 &no-backspace
+		.selection/to LDZ2 .selection/from LDZ2 -- #0001 ++ STH2
+		.selection/from LDZ2 ;MEMORY ++ STH2kr ;shift-memory-left JSR2
+		;MEMORY-LEN LDA2 STH2r -- ;MEMORY-LEN STA2 &no-backspace
 	( number keys )
 	DUP #2f > OVR #3a < #0101 !! ,&no-number JCN
 		DUP #30 - ;write JSR2 &no-number
@@ -191,6 +195,30 @@ BRK
 	;redraw JSR2
 
 BRK
+
+@follow ( -- )
+	
+	( up )
+	.selection/from LDZ2 #03 SFT2 STH2k
+	.selection/scroll LDZ2
+	>> ,&no-follow-up JCN
+		STH2r .selection/scroll STZ2
+		RTN
+	&no-follow-up
+	POP2r
+
+	( down )
+	.selection/to LDZ2 #03 SFT2 STH2k
+	.selection/scroll LDZ2 .Screen/height DEI2 8// #0002 -- ++ 
+	<< ,&no-follow-down JCN
+		STH2r
+		.Screen/height DEI2 8// #0003 --
+		-- .selection/scroll STZ2
+		RTN
+	&no-follow-down
+	POP2r
+
+RTN
 
 @write ( char -- )
 	
@@ -321,7 +349,7 @@ RTN
 		STH2kr ;MEMORY -- ;MEMORY-LEN LDA2 << ,&within-file JCN
 		&blank
 			;font #2e TOS 8** ++ .Screen/addr DEO2 
-			#23 .Screen/color DEO
+			#23 [ STH2kr ;is-selected JSR2 ] - .Screen/color DEO
 			,&resume JMP
 		&within-file
 			STH2kr LDA TOS 8** ;font ++ .Screen/addr DEO2 
@@ -417,27 +445,29 @@ RTN
 
 RTN
 
-@shift-memory-left ( addr* -- )
-
+@shift-memory-left ( addr* length* -- )
+	
+	STH2
 	DUP2 ;MEMORY-LEN LDA2 ++
 	&loop
-		OVR2 #0001 ++ LDA STH
-		OVR2 STHr ROT ROT STA
+		OVR2 DUP2 STH2kr ++ LDA ROT ROT STA
 		INCR2
 		NEQ2k ,&loop JCN
 	POP2 POP2
+	POP2r
 	
 RTN
 
-@shift-memory-right ( addr* -- )
+@shift-memory-right ( addr* length* -- )
 	
+	STH2
 	DUP2 ;MEMORY-LEN LDA2 ++ SWP2 #0001 --
 	&loop
-		OVR2 LDA STH
-		OVR2 #0001 ++ STHr ROT ROT STA
+		OVR2 DUP2 LDA ROT ROT STH2kr ++ STA
 		DECR2
 		NEQ2k ,&loop JCN
 	POP2 POP2
+	POP2r
 	
 RTN
 
