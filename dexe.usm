@@ -7,6 +7,7 @@
 		rename
 		touch scrollbar
 		clamp position on delete
+		no negative selection size
 )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
@@ -88,14 +89,14 @@ BRK
 	.Mouse/wheel DEI #01 ! ,&no-scroll-up JCN
 		( clamp ) .selection/from LDZ2 #0008 << ,&no-scroll-up JCN
 		( move ) .selection/from LDZ2 #0008 -- DUP2 .selection/from STZ2 .selection/to STZ2
-		;redraw JSR2 BRK
+		;follow JSR2 ;redraw JSR2 BRK
 	&no-scroll-up
 
 	( on scroll down )
 	.Mouse/wheel DEI #ff ! ,&no-scroll-down JCN
 		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0008 -- >> ,&no-scroll-down JCN
 		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2
-		;redraw JSR2 BRK
+		;follow JSR2 ;redraw JSR2 BRK
 	&no-scroll-down
 
 	.Mouse/state DEI DUP .pointer/last STZ #01 JCN [ BRK ]
@@ -106,6 +107,10 @@ BRK
 	DUP2 ;MEMORY-LEN LDA2 STH2k << ,&no-clamp JCN
 		POP2 STH2kr #0001 -- &no-clamp POP2r
 	.selection/to STZ2
+
+	( clamp, no negative )
+	.selection/to LDZ2 .selection/from LDZ2 >> ,&no-negative JCN
+		.selection/from LDZ2 .selection/to STZ2 &no-negative
 
 	#00 .selection/nibble STZ
 
@@ -131,22 +136,16 @@ BRK
 @on-touch-toolbar ( -> )
 	
 	.Mouse/x DEI2 8// .Screen/width DEI2 8// TOB SWP -
-
 	DUP #01 ! ,&no-save JCN
 		;save-file JSR2
-		RELEASE-MOUSE
-		;redraw JSR2
-		&no-save
+		RELEASE-MOUSE ;redraw JSR2 &no-save
 	DUP #03 ! ,&no-load JCN
 		;load-file JSR2
-		RELEASE-MOUSE
-		;redraw JSR2
-		&no-load
+		RELEASE-MOUSE ;redraw JSR2 &no-load
 	DUP #04 ! ,&no-blank JCN
 		;blank-txt ;new-file JSR2
-		RELEASE-MOUSE
-		;redraw JSR2
-		&no-blank
+		#0002 ;MEMORY-LEN STA2
+		RELEASE-MOUSE ;redraw JSR2 &no-blank
 	POP
 
 BRK
@@ -176,14 +175,17 @@ BRK
 	POP
 
 	.Controller/key DEI
+	( insert )
 	DUP #0d ! ,&no-enter JCN
 		.selection/to LDZ2 .selection/from LDZ2 -- #0001 ++ STH2
 		.selection/from LDZ2 ;MEMORY ++ STH2kr ;shift-memory-right JSR2
 		;MEMORY-LEN LDA2 STH2r ++ ;MEMORY-LEN STA2 &no-enter
+	( erase )
 	DUP #08 ! ,&no-backspace JCN
 		.selection/to LDZ2 .selection/from LDZ2 -- #0001 ++ STH2
 		.selection/from LDZ2 ;MEMORY ++ STH2kr ;shift-memory-left JSR2
-		;MEMORY-LEN LDA2 STH2r -- ;MEMORY-LEN STA2 &no-backspace
+		;MEMORY-LEN LDA2 STH2r -- ;MEMORY-LEN STA2 
+		.selection/from LDZ2 .selection/to STZ2 &no-backspace
 	( number keys )
 	DUP #2f > OVR #3a < #0101 !! ,&no-number JCN
 		DUP #30 - ;write JSR2 &no-number
@@ -445,6 +447,24 @@ RTN
 
 RTN
 
+@draw-filepath ( color -- )
+	
+	STH
+	.Screen/height DEI2 #0008 -- .Screen/y DEO2
+	;path/name
+	&loop
+		LDAk TOS #0008 ** ;font ++ .Screen/addr DEO2 
+		STHkr .Screen/color DEO
+		.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+		#0001 ++
+		LDAk ,&loop JCN
+	POP2
+	POPr
+	( clear last ) 
+	#20 .Screen/color DEO
+
+RTN
+
 @shift-memory-left ( addr* length* -- )
 	
 	STH2
@@ -482,8 +502,20 @@ RTN
 
 RTN
 
+@clear ( from* to* -- )
+	
+	;MEMORY DUP2 ;MEMORY-LEN LDA2 ++
+	&loop
+		OVR2 #00 ROT ROT STA
+		INCR2
+		LTH2k ,&loop JCN
+	POP2 POP2
+
+RTN
+
 @new-file ( default* -- )
-		
+	
+	;clear JSR2
 	( reset ) #0000 DUP2 .selection/from STZ2 .selection/to STZ2 
 	#0002 ;MEMORY-LEN STA2
 	#0000 .selection/from LDZ2 ;MEMORY ++ STA2
@@ -514,24 +546,6 @@ RTN
 	;path/name .File/name DEO2 
 	#2000 .File/length DEO2 
 	;MEMORY .File/save DEO2
-
-RTN
-
-@draw-filepath ( color -- )
-	
-	STH
-	.Screen/height DEI2 #0008 -- .Screen/y DEO2
-	;path/name
-	&loop
-		LDAk TOS #0008 ** ;font ++ .Screen/addr DEO2 
-		STHkr .Screen/color DEO
-		.Screen/x DEI2 #0008 ++ .Screen/x DEO2
-		#0001 ++
-		LDAk ,&loop JCN
-	POP2
-	POPr
-	( clear last ) 
-	#20 .Screen/color DEO
 
 RTN
 
