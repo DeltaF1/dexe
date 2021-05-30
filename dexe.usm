@@ -2,11 +2,8 @@
 	app/dexe : hex editor
 	
 	TODO:
-		center frame
 		follow cursor
-		erase
 		copy
-		insert
 		paste
 		save
 		load
@@ -23,6 +20,9 @@
 %8**  { #30 SFT2 } %8//  { #03 SFT2 }
 %TOS  { #00 SWP } %TOB { SWP POP }
 %INCR { SWP #01 + SWP }
+%TOGGLE { DUP LDZ #00 = SWP STZ }
+%INCR2 { SWP2 #0001 ++ SWP2 }
+%DECR2 { SWP2 #0001 -- SWP2 }
 %DEBUG  { .Console/byte DEO #0a .Console/char DEO }
 %DEBUG2 { .Console/short DEO2 #0a .Console/char DEO }
 %RELEASE-MOUSE { #00 .Mouse/state DEO }
@@ -48,6 +48,7 @@
 	&from $2
 	&to $2
 	&scroll $2
+	&nibble $1
 @path 
 	&length $1
 	&name $20
@@ -107,6 +108,8 @@ BRK
 		POP2 STH2kr #0001 -- &no-clamp POP2r
 	.selection/to STZ2
 
+	#00 .selection/nibble STZ
+
 	;redraw JSR2
 
 BRK
@@ -131,22 +134,57 @@ BRK
 	.Controller/button DEI #f0 AND
 	DUP #04 SFT #01 AND #01 ! ,&no-up JCN
 		( clamp ) .selection/from LDZ2 #0008 << ,&no-up JCN
-		( move ) .selection/from LDZ2 #0008 -- DUP2 .selection/from STZ2 .selection/to STZ2 &no-up
+		( move ) .selection/from LDZ2 #0008 -- DUP2 .selection/from STZ2 .selection/to STZ2 
+		#00 .selection/nibble STZ &no-up
 	DUP #05 SFT #01 AND #01 ! ,&no-down JCN
 		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0008 -- >> ,&no-down JCN
-		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2 &no-down
+		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2 
+		#00 .selection/nibble STZ &no-down
 	DUP #06 SFT #01 AND #01 ! ,&no-left JCN
 		( clamp ) .selection/from LDZ2 #0007 AND2 #0000 == ,&no-left JCN
-		( move ) .selection/from LDZ2 #0001 -- DUP2 .selection/from STZ2 .selection/to STZ2 &no-left
+		( move ) .selection/from LDZ2 #0001 -- DUP2 .selection/from STZ2 .selection/to STZ2 
+		#00 .selection/nibble STZ &no-left
 	DUP #07 SFT #01 AND #01 ! ,&no-right JCN
 		( clamp ) .selection/from LDZ2 #0007 AND2 #0007 == ,&no-right JCN
 		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0001 -- == ,&no-right JCN
-		( move ) .selection/from LDZ2 #0001 ++ DUP2 .selection/from STZ2 .selection/to STZ2 &no-right
-	#00 = #04 JCN 
+		( move ) .selection/from LDZ2 #0001 ++ DUP2 .selection/from STZ2 .selection/to STZ2 
+		#00 .selection/nibble STZ &no-right
+	POP
+
+	.Controller/key DEI
+	DUP #0d ! ,&no-enter JCN
+		.selection/from LDZ2 ;MEMORY ++ ;shift-memory-right JSR2
+		;MEMORY-LEN LDA2 #0001 ++ ;MEMORY-LEN STA2
+		#00 .selection/from LDZ2 ;MEMORY ++ STA &no-enter
+	DUP #08 ! ,&no-backspace JCN
+		.selection/from LDZ2 ;MEMORY ++ ;shift-memory-left JSR2
+		;MEMORY-LEN LDA2 #0001 -- ;MEMORY-LEN STA2 &no-backspace
+	( number keys )
+	DUP #2f > OVR #3a < #0101 !! ,&no-number JCN
+		DUP #30 - ;write JSR2 &no-number
+	( lc letter )
+	DUP #60 > OVR #67 < #0101 !! ,&no-lc-letter JCN
+		DUP #60 - #09 + ;write JSR2 &no-lc-letter
+	POP
 
 	;redraw JSR2
 
 BRK
+
+@write ( char -- )
+	
+	.selection/from LDZ2 ;MEMORY ++ STH2k LDA
+	.selection/nibble LDZ ,&lo JCN
+		#0f AND SWP #40 SFT +
+		,&continue JMP
+	&lo
+		#f0 AND +
+	&continue
+	STH2r STA
+	( toggle nibble )
+	.selection/nibble TOGGLE
+
+RTN
 
 @redraw ( -- )
 	
@@ -257,14 +295,15 @@ RTN
 	#00 #08
 	&ascii-loop
 		OVR TOS STH2kr ++ STH2
-
 		( is end of file )
+		STH2kr LDA #00 = ,&blank JCN
 		STH2kr ;MEMORY -- ;MEMORY-LEN LDA2 << ,&within-file JCN
+		&blank
 			;font #2e TOS 8** ++ .Screen/addr DEO2 
 			#23 .Screen/color DEO
 			,&resume JMP
 		&within-file
-			STH2kr LDA #20 - TOS 8** ;font ++ .Screen/addr DEO2 
+			STH2kr LDA TOS 8** ;font ++ .Screen/addr DEO2 
 			#21 [ STH2kr ;is-selected JSR2 #0b * ] + .Screen/color DEO
 		&resume
 		POP2r
@@ -329,7 +368,7 @@ RTN
 RTN
 
 @draw-scrollbar ( -- )
-	
+
 	;scrollbar_icn ( keeping a copy on stack )
 
 	.Screen/width DEI2 #0008 -- .Screen/x DEO2
@@ -355,6 +394,30 @@ RTN
 	#0018 ++ .Screen/addr DEO2
 	( draw ) #23 .Screen/color DEO
 
+RTN
+
+@shift-memory-left ( addr* -- )
+
+	DUP2 ;MEMORY-LEN LDA2 ++
+	&loop
+		OVR2 #0001 ++ LDA STH
+		OVR2 STHr ROT ROT STA
+		INCR2
+		NEQ2k ,&loop JCN
+	POP2 POP2
+	
+RTN
+
+@shift-memory-right ( addr* -- )
+	
+	DUP2 ;MEMORY-LEN LDA2 ++ SWP2 #0001 --
+	&loop
+		OVR2 LDA STH
+		OVR2 #0001 ++ STHr ROT ROT STA
+		DECR2
+		NEQ2k ,&loop JCN
+	POP2 POP2
+	
 RTN
 
 @get-cell ( x* y* -- addr* )
