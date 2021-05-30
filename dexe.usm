@@ -433,9 +433,12 @@ RTN
 		OVR2 OVR2 LTH2 ,&loop JCN
 	POP2 POP2
 
-	.selection/scroll LDZ2 #0008 ++ .Screen/y DEO2
-	DUP2 #0008 ++ .Screen/addr DEO2
-	( draw ) #21 .Screen/color DEO
+	;MEMORY-LEN LDA2 #03 SFT2 
+	.Screen/height DEI2 8// #0002 -- 
+	<< ,&skip-indicator JCN
+		.selection/scroll LDZ2 #0008 ++ .Screen/y DEO2
+		DUP2 #0008 ++ .Screen/addr DEO2
+		( draw ) #21 .Screen/color DEO &skip-indicator
 
 	#0000 .Screen/y DEO2
 	DUP2 #0010 ++ .Screen/addr DEO2
