@@ -5,10 +5,7 @@
 		follow cursor
 		copy
 		paste
-		save
-		load
 		rename
-		blank
 )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
@@ -78,6 +75,7 @@ BRK
 	
 	;draw-cursor JSR2
 
+	.Mouse/state DEI #00 ! .Mouse/y DEI2 .Screen/height DEI2 #0008 -- >> #0101 == ;on-touch-toolbar JCN2
 	.Mouse/state DEI #00 ! .Mouse/x DEI2 .Screen/width DEI2 #0008 -- >> #0101 == ;on-touch-scrollbar JCN2
 
 	( on mouse-down )
@@ -125,6 +123,29 @@ BRK
 		( clamp ) ( TODO )
 		.selection/scroll LDZ2 #0001 ++ .selection/scroll STZ2
 		;redraw JSR2 POP RELEASE-MOUSE BRK &no-down
+	POP
+
+BRK
+
+@on-touch-toolbar ( -> )
+	
+	.Mouse/x DEI2 8// .Screen/width DEI2 8// TOB SWP -
+
+	DUP #01 ! ,&no-save JCN
+		;save-file JSR2
+		RELEASE-MOUSE
+		;redraw JSR2
+		&no-save
+	DUP #03 ! ,&no-load JCN
+		;load-file JSR2
+		RELEASE-MOUSE
+		;redraw JSR2
+		&no-load
+	DUP #04 ! ,&no-blank JCN
+		;blank-txt ;new-file JSR2
+		RELEASE-MOUSE
+		;redraw JSR2
+		&no-blank
 	POP
 
 BRK
@@ -432,8 +453,10 @@ RTN
 RTN
 
 @new-file ( default* -- )
-	
-	( BANK LENGTH ;op-clear JSR2 )
+		
+	( reset ) #0000 DUP2 .selection/from STZ2 .selection/to STZ2 
+	#0002 ;MEMORY-LEN STA2
+	#0000 .selection/from LDZ2 ;MEMORY ++ STA2
 	STH2
 	#00 #0c
 	&loop
