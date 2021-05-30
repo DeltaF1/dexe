@@ -12,25 +12,7 @@ uxnasm noodle.usm noodle.rom && uxnemu noodle.rom
 
 ## Controls
 
-### Generics
-
-- `ctrl+n` New
-- `ctrl+r` Reload
-- `ctrl+s` Save(.chr)
-- `ctrl+h` Toggle Guides
-
-### General
-
-- `0-9a-f` Insert
-- `backspace` Erase
-- `ctrl+up` Increment
-- `ctrl+down` Decrement
-- `ctrl+left` Roll Right
-- `ctrl+right` Roll Left
-
-### Move
-
-- `up` Move up
-- `down` Move down
-- `left` Move left
-- `right` Move right
+- `arrows`, move selection
+- `enter`, insert byte
+- `backspace`, delete byte
+- `left-click`, select bytes

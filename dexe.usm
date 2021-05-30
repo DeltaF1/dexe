@@ -1,13 +1,14 @@
 (
 	app/dexe : hex editor
 	
+	arrows     - move selection
+	enter      - insert byte
+	backspace  - delete byte
+	left-click - select bytes
+
 	TODO:
-		copy
-		paste
-		rename
-		touch scrollbar
-		clamp position on delete
-		no negative selection size
+		copy/paste
+		scrollbar
 )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
@@ -24,6 +25,7 @@
 %DECR2 { SWP2 #0001 -- SWP2 }
 %DEBUG  { .Console/byte DEO #0a .Console/char DEO }
 %DEBUG2 { .Console/short DEO2 #0a .Console/char DEO }
+%ASCII-FONT { TOS #0008 ** ;font-hex ++ }
 %RELEASE-MOUSE { #00 .Mouse/state DEO }
 
 ( devices )
@@ -39,6 +41,10 @@
 
 |0000
 
+@state
+	&timer $1
+	&trap $1
+	&blink $1
 @pointer
 	&x $2 
 	&y $2
@@ -64,13 +70,26 @@
 	( vectors ) 
 	;on-button .Controller/vector DEO2
 	;on-mouse .Mouse/vector DEO2
+	;on-frame    .Screen/vector DEO2
 
 	;untitled-txt ;new-file JSR2
 
-	.File/success DEI2 ;MEMORY-LEN STA2
-
 	;redraw JSR2
 
+BRK
+
+@on-frame ( -> )
+	
+	.state/trap LDZ #00 ! #01 JCN [ BRK ]
+
+	( incr ) .state/timer LDZ #01 + DUP .state/timer STZ 
+
+	#08 ! ,&no-toggle JCN
+		.state/blink TOGGLE
+		#23 .state/blink LDZ #09 * + ;draw-filepath JSR2
+		#00 .state/timer STZ 
+	&no-toggle
+	
 BRK
 
 @on-mouse ( -> )
@@ -81,9 +100,10 @@ BRK
 	.Mouse/state DEI #00 ! .Mouse/x DEI2 .Screen/width DEI2 #0008 -- >> #0101 == ;on-touch-scrollbar JCN2
 
 	( on mouse-down )
-	.Mouse/state DEI #00 > .pointer/last LDZ #0100 !! ,&no-mouse-down JCN
-		.Mouse/x DEI2 .Mouse/y DEI2 .selection/scroll LDZ2 #0008 ** ++ ;get-cell JSR2 .selection/from STZ2
-	&no-mouse-down
+	.Mouse/state DEI #00 > .pointer/last LDZ 
+	DUP2 #0100 !! ,&no-mouse-down JCN
+		.Mouse/x DEI2 .Mouse/y DEI2 .selection/scroll LDZ2 #0008 ** ++ ;get-cell JSR2 .selection/from STZ2 &no-mouse-down
+	POP2
 
 	( on scroll up )
 	.Mouse/wheel DEI #01 ! ,&no-scroll-up JCN
@@ -102,15 +122,9 @@ BRK
 	.Mouse/state DEI DUP .pointer/last STZ #01 JCN [ BRK ]
 
 	.Mouse/x DEI2 .Mouse/y DEI2 .selection/scroll LDZ2 #0008 ** ++ ;get-cell JSR2 
-
-	( clamp )
-	DUP2 ;MEMORY-LEN LDA2 STH2k << ,&no-clamp JCN
-		POP2 STH2kr #0001 -- &no-clamp POP2r
 	.selection/to STZ2
 
-	( clamp, no negative )
-	.selection/to LDZ2 .selection/from LDZ2 >> ,&no-negative JCN
-		.selection/from LDZ2 .selection/to STZ2 &no-negative
+	;clamp-selection JSR2
 
 	#00 .selection/nibble STZ
 
@@ -143,15 +157,21 @@ BRK
 		;load-file JSR2
 		RELEASE-MOUSE ;redraw JSR2 &no-load
 	DUP #04 ! ,&no-blank JCN
-		;blank-txt ;new-file JSR2
-		#0002 ;MEMORY-LEN STA2
+		;untitled-txt ;new-file JSR2
 		RELEASE-MOUSE ;redraw JSR2 &no-blank
+	DUP #25 < OVR #05 > #0101 !! ,&no-rename JCN
+		.state/trap TOGGLE
+		#00 .state/blink STZ 
+		#23 ;draw-filepath JSR2
+		RELEASE-MOUSE ;redraw JSR2 &no-rename
 	POP
 
 BRK
 
 @on-button ( -> )
 	
+	.Controller/key DEI #00 ! .state/trap LDZ #0101 == ;on-button-trap JCN2
+
 	.Controller/button DEI #f0 AND
 	DUP #04 SFT #01 AND #01 ! ,&no-up JCN
 		( clamp ) .selection/from LDZ2 #0008 << ,&no-up JCN
@@ -159,7 +179,6 @@ BRK
 		;follow JSR2
 		#00 .selection/nibble STZ &no-up
 	DUP #05 SFT #01 AND #01 ! ,&no-down JCN
-		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0008 -- >> ,&no-down JCN
 		( move ) .selection/from LDZ2 #0008 ++ DUP2 .selection/from STZ2 .selection/to STZ2 
 		;follow JSR2
 		#00 .selection/nibble STZ &no-down
@@ -169,10 +188,11 @@ BRK
 		#00 .selection/nibble STZ &no-left
 	DUP #07 SFT #01 AND #01 ! ,&no-right JCN
 		( clamp ) .selection/from LDZ2 #0007 AND2 #0007 == ,&no-right JCN
-		( clamp ) .selection/from LDZ2 ;MEMORY-LEN LDA2 #0001 -- == ,&no-right JCN
 		( move ) .selection/from LDZ2 #0001 ++ DUP2 .selection/from STZ2 .selection/to STZ2 
 		#00 .selection/nibble STZ &no-right
 	POP
+
+	;clamp-selection JSR2
 
 	.Controller/key DEI
 	( insert )
@@ -182,7 +202,11 @@ BRK
 		;MEMORY-LEN LDA2 STH2r ++ ;MEMORY-LEN STA2 &no-enter
 	( erase )
 	DUP #08 ! ,&no-backspace JCN
+		( no erase when size is tiny )
+		;MEMORY-LEN LDA2 #0003 << ,&no-backspace JCN
 		.selection/to LDZ2 .selection/from LDZ2 -- #0001 ++ STH2
+		( no erase when size is small )
+		STH2kr ;MEMORY-LEN LDA2 #0002 -- >> ,&no-backspace JCN
 		.selection/from LDZ2 ;MEMORY ++ STH2kr ;shift-memory-left JSR2
 		;MEMORY-LEN LDA2 STH2r -- ;MEMORY-LEN STA2 
 		.selection/from LDZ2 .selection/to STZ2 &no-backspace
@@ -195,6 +219,31 @@ BRK
 	POP
 
 	;redraw JSR2
+
+BRK
+
+@on-button-trap ( -> )
+
+	( enter )
+	.Controller/key DEI #0d ! ,&no-edit-enter JCN
+		#00 .state/trap STZ
+		#23 ;draw-filepath JSR2
+		BRK
+		&no-edit-enter
+	( backspace )
+	.Controller/key DEI #08 ! ,&no-edit-backspace JCN
+		.path/length LDZ #00 = ,&edit-end JCN
+		.path/length LDZ #01 - .path/length STZ
+		#00 .path/name .path/length LDZ + STZ
+		#23 ;draw-filepath JSR2
+		BRK
+		&no-edit-backspace
+	( default )
+	.path/length LDZ #1f = ,&edit-end JCN
+		.Controller/key DEI .path/name .path/length LDZ + STZ
+		.path/length LDZ #01 + .path/length STZ
+	&edit-end
+	#00 .path/name .path/length LDZ + STZ
 
 BRK
 
@@ -248,7 +297,7 @@ RTN
 	#0000 .Screen/height DEI2 #0010 --
 	&loop
 		#0000 .Screen/x DEO2
-		OVR2 STH2kr ++ ;draw-line JSR2
+		OVR2 STH2kr ++ ,draw-line JSR
 		SWP2 #0008 ++ SWP2
 		OVR2 .Screen/y DEO2
 		LTH2k ,&loop JCN
@@ -256,28 +305,7 @@ RTN
 	POP2r
 
 	;draw-scrollbar JSR2
-
-	( selection )
-	.Screen/height DEI2 #0008 -- .Screen/y DEO2
-	#0000 .Screen/x DEO2
-	.selection/to LDZ2 #22 .selection/from LDZ2 .selection/to LDZ2 == - ;draw-short JSR2
-	#0028 .Screen/x DEO2
-	;MEMORY-LEN LDA2 #23 ;draw-short JSR2
-
-	( path )
-	#0050 .Screen/x DEO2
-	#21 ;draw-filepath JSR2
-
-	( draw filesize )
-	.Screen/width DEI2 #0008 -- .Screen/x DEO2
-	;save-icn .Screen/addr DEO2
-	#21 .Screen/color DEO
-	.Screen/x DEI2 #0010 -- .Screen/x DEO2
-	;load-icn .Screen/addr DEO2
-	#21 .Screen/color DEO
-	.Screen/x DEI2 #0008 -- .Screen/x DEO2
-	;make-icn .Screen/addr DEO2
-	#21 .Screen/color DEO
+	;draw-toolbar JSR2
 
 RTN
 
@@ -291,14 +319,12 @@ RTN
 	( icn )
 	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 	STH2kr .Screen/addr DEO2
-	STH2kr #0008 // #0001 AND2 #0001 == #22 + .Screen/color DEO
+	#21 .Screen/color DEO
 
 	( chr )
-	STH2kr #0008 // #0001 AND2 #0000 == ,&no-chr JCN
-		.Screen/x DEI2 #0010 ++ .Screen/x DEO2
-		STH2kr .Screen/addr DEO2
-		#41 .Screen/color DEO
-	&no-chr
+	.Screen/x DEI2 #0010 ++ .Screen/x DEO2
+	STH2kr .Screen/addr DEO2
+	#41 STH2kr #0008 // #0001 AND2 #0000 == - .Screen/color DEO
 
 	POP2r
 
@@ -320,10 +346,10 @@ RTN
 			.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 			,&resume JMP
 		&within-file
-			STH2kr LDA #04 SFT TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+			STH2kr LDA #04 SFT ASCII-FONT .Screen/addr DEO2
 			#21 [ STH2kr ;is-selected JSR2 #07 * ] + .Screen/color DEO
 			.Screen/x DEI2 #0008 ++ .Screen/x DEO2
-			STH2kr LDA #0f AND TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+			STH2kr LDA #0f AND ASCII-FONT .Screen/addr DEO2
 			#21 [ STH2kr ;is-selected JSR2 #07 * ] + .Screen/color DEO
 			.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 		&resume
@@ -366,34 +392,44 @@ RTN
 
 RTN
 
-@is-selected ( addr* -- flag )
-	
-	;MEMORY --
-	 
-	DUP2 .selection/from LDZ2 !! ,&no-from JCN
-		POP2 #01 RTN &no-from 
-	DUP2 .selection/to LDZ2 !! ,&no-to JCN
-		POP2 #01 RTN &no-to 
-	STH2k
+@draw-toolbar ( -- )
 
-	.selection/from LDZ2 >> 
-	STH2r .selection/to LDZ2 << 
-	#0101 ==
+	( selection )
+	.Screen/height DEI2 #0008 -- .Screen/y DEO2
+	#0000 .Screen/x DEO2
+	.selection/to LDZ2 #22 .selection/from LDZ2 .selection/to LDZ2 == - ;draw-short JSR2
+	#0028 .Screen/x DEO2
+	;MEMORY-LEN LDA2 #23 ;draw-short JSR2
+
+	( path )
+	#0050 .Screen/x DEO2
+	#21 ;draw-filepath JSR2
+
+	( draw filesize )
+	.Screen/width DEI2 #0008 -- .Screen/x DEO2
+	;save-icn .Screen/addr DEO2
+	#21 .Screen/color DEO
+	.Screen/x DEI2 #0010 -- .Screen/x DEO2
+	;load-icn .Screen/addr DEO2
+	#21 .Screen/color DEO
+	.Screen/x DEI2 #0008 -- .Screen/x DEO2
+	;make-icn .Screen/addr DEO2
+	#21 .Screen/color DEO
 
 RTN
 
 @draw-short ( short* color -- )
 
 	STH SWP 
-	DUP #04 SFT TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+	DUP #04 SFT ASCII-FONT .Screen/addr DEO2
 	( draw ) STHkr .Screen/color DEO
-	#0f AND TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+	#0f AND ASCII-FONT .Screen/addr DEO2
 	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 	( draw ) STHkr .Screen/color DEO
-	DUP #04 SFT TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+	DUP #04 SFT ASCII-FONT .Screen/addr DEO2
 	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 	( draw ) STHkr .Screen/color DEO
-	#0f AND TOS #0008 ** ;font-hex ++ .Screen/addr DEO2
+	#0f AND ASCII-FONT .Screen/addr DEO2
 	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
 	( draw ) STHr .Screen/color DEO
 
@@ -453,6 +489,7 @@ RTN
 @draw-filepath ( color -- )
 	
 	STH
+	#0050 .Screen/x DEO2
 	.Screen/height DEI2 #0008 -- .Screen/y DEO2
 	;path/name
 	&loop
@@ -494,6 +531,35 @@ RTN
 	
 RTN
 
+@clamp-selection ( -- )
+	
+	( no outside )
+	;MEMORY-LEN LDA2 STH2
+	.selection/from LDZ2 STH2kr << ,&skip-from JCN
+		STH2kr #0001 -- .selection/from STZ2 &skip-from
+	.selection/to LDZ2 STH2kr << ,&skip-to JCN
+		STH2kr #0001 -- .selection/to STZ2 &skip-to
+	POP2r
+	( no backward )
+	.selection/to LDZ2 .selection/from LDZ2 >> ,&no-negative JCN
+		.selection/from LDZ2 .selection/to STZ2 &no-negative
+	
+RTN
+
+@is-selected ( addr* -- flag )
+	
+	;MEMORY --
+	DUP2 .selection/from LDZ2 !! ,&no-from JCN
+		POP2 #01 RTN &no-from 
+	DUP2 .selection/to LDZ2 !! ,&no-to JCN
+		POP2 #01 RTN &no-to 
+	STH2k
+	.selection/from LDZ2 >> 
+	STH2r .selection/to LDZ2 << 
+	#0101 ==
+
+RTN
+
 @get-cell ( x* y* -- addr* )
 
 	( row ) 8// #0008 ** SWP2
@@ -519,9 +585,7 @@ RTN
 @new-file ( default* -- )
 	
 	;clear JSR2
-	( reset ) #0000 DUP2 .selection/from STZ2 .selection/to STZ2 
-	#0002 ;MEMORY-LEN STA2
-	#0000 .selection/from LDZ2 ;MEMORY ++ STA2
+	( unselect ) #0000 DUP2 .selection/from STZ2 .selection/to STZ2 
 	STH2
 	#00 #0c
 	&loop
@@ -531,7 +595,7 @@ RTN
 		LTHk ,&loop JCN
 	.path/length STZ POP 
 	POP2r
-	;load-file JSR2
+	#0002 ;MEMORY-LEN STA2
 
 RTN
 
@@ -539,21 +603,21 @@ RTN
 
 	( BANK LENGTH ;op-clear JSR2 )
 	;path/name .File/name DEO2 
-	#2000 .File/length DEO2 
+	#fff0 ;MEMORY -- .File/length DEO2 
 	;MEMORY .File/load DEO2
+	.File/success DEI2 ;MEMORY-LEN STA2
 
 RTN
 
 @save-file ( -- )
 
 	;path/name .File/name DEO2 
-	#2000 .File/length DEO2 
+	;MEMORY-LEN LDA2 .File/length DEO2 
 	;MEMORY .File/save DEO2
 
 RTN
 
-@untitled-txt  "example.chr $1
-@blank-txt     "blank.chr $1
+@untitled-txt  "untitled.chr $1
 @save-icn      1054 28c6 2854 1000 
 @make-icn      fe82 8282 848a f400 
 @load-icn      feaa d6aa d4aa f400 
