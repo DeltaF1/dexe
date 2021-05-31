@@ -1,13 +1,13 @@
 # Dexe
 
-A minimal [hex editor](https://wiki.xxiivv.com/site/dexe.html), written in Uxambly.
+Dexe is a [hex editor](https://wiki.xxiivv.com/site/dexe.html), written in [Uxntal](https://wiki.xxiivv.com/site/uxntal.html).
 
 ## Build
 
 You must have the [Uxn](https://git.sr.ht/~rabbits/uxn/) assembler and emulator.
 
 ```
-uxnasm noodle.usm noodle.rom && uxnemu noodle.rom
+uxnasm noodle.tal noodle.rom && uxnemu noodle.rom
 ```
 
 ## Controls

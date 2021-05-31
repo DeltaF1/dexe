@@ -32,7 +32,7 @@ rm -rf bin
 mkdir bin
 
 echo "Assembling.."
-uxnasm dexe.usm bin/dexe.rom 
+uxnasm dexe.tal bin/dexe.rom 
 
 echo "Installing.."
 if [ -d "$HOME/roms" ] && [ -e ./bin/dexe.rom ]
