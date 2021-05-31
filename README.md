@@ -1,6 +1,6 @@
 # Dexe
 
-A minimal hex editor, written in ANSI C.
+A minimal [hex editor](https://wiki.xxiivv.com/site/dexe.html), written in Uxambly.
 
 ## Build
 
