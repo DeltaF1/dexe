@@ -27,6 +27,7 @@
 %DEBUG2 { .Console/short DEO2 #0a .Console/char DEO }
 %ASCII-FONT { TOS #0008 ** ;font-hex ++ }
 %RELEASE-MOUSE { #00 .Mouse/state DEO }
+%RESET-SELECTION { #0000 DUP2 .selection/from STZ2 .selection/to STZ2 }
 
 ( devices )
 
@@ -96,8 +97,10 @@ BRK
 	
 	;draw-cursor JSR2
 
-	.Mouse/state DEI #00 ! .Mouse/y DEI2 .Screen/height DEI2 #0008 -- >> #0101 == ;on-touch-toolbar JCN2
-	.Mouse/state DEI #00 ! .Mouse/x DEI2 .Screen/width DEI2 #0008 -- >> #0101 == ;on-touch-scrollbar JCN2
+	.Mouse/state DEI #00 ! .Mouse/y DEI2 .Screen/height DEI2 #0008 -- >> #0101 == 
+		;on-touch-toolbar JCN2
+	.Mouse/state DEI #00 ! .Mouse/x DEI2 .Screen/width DEI2 #0008 -- >> #0101 == 
+		;on-touch-scrollbar JCN2
 
 	( on mouse-down )
 	.Mouse/state DEI #00 > .pointer/last LDZ 
@@ -228,21 +231,18 @@ BRK
 	.Controller/key DEI #0d ! ,&no-edit-enter JCN
 		#00 .state/trap STZ
 		#23 ;draw-filepath JSR2
-		BRK
-		&no-edit-enter
+		BRK &no-edit-enter
 	( backspace )
 	.Controller/key DEI #08 ! ,&no-edit-backspace JCN
 		.path/length LDZ #00 = ,&edit-end JCN
 		.path/length LDZ #01 - .path/length STZ
 		#00 .path/name .path/length LDZ + STZ
 		#23 ;draw-filepath JSR2
-		BRK
-		&no-edit-backspace
+		BRK &no-edit-backspace
 	( default )
 	.path/length LDZ #1f = ,&edit-end JCN
 		.Controller/key DEI .path/name .path/length LDZ + STZ
-		.path/length LDZ #01 + .path/length STZ
-	&edit-end
+		.path/length LDZ #01 + .path/length STZ &edit-end
 	#00 .path/name .path/length LDZ + STZ
 
 BRK
@@ -254,8 +254,7 @@ BRK
 	.selection/scroll LDZ2
 	>> ,&no-follow-up JCN
 		STH2r .selection/scroll STZ2
-		RTN
-	&no-follow-up
+		RTN &no-follow-up
 	POP2r
 
 	( down )
@@ -265,8 +264,7 @@ BRK
 		STH2r
 		.Screen/height DEI2 8// #0003 --
 		-- .selection/scroll STZ2
-		RTN
-	&no-follow-down
+		RTN &no-follow-down
 	POP2r
 
 RTN
@@ -324,7 +322,7 @@ RTN
 	( chr )
 	.Screen/x DEI2 #0010 ++ .Screen/x DEO2
 	STH2kr .Screen/addr DEO2
-	#41 STH2kr #0008 // #0001 AND2 #0000 == - .Screen/color DEO
+	#41 STH2kr #0008 // #0001 AND2 #0001 == - .Screen/color DEO
 
 	POP2r
 
@@ -584,17 +582,21 @@ RTN
 
 @new-file ( default* -- )
 	
+	#20 ;draw-filepath JSR2 
+
 	;clear JSR2
-	( unselect ) #0000 DUP2 .selection/from STZ2 .selection/to STZ2 
+	RESET-SELECTION
+
 	STH2
 	#00 #0c
 	&loop
-		OVR DUP TOS STH2kr ++ LDA
-		SWP .path/name + STZ
+		OVR DUP TOS STH2kr ++ LDA SWP .path/name + STZ
 		INCR
 		LTHk ,&loop JCN
 	.path/length STZ POP 
 	POP2r
+
+	#00 .path/name #0c + STZ
 	#0002 ;MEMORY-LEN STA2
 
 RTN
