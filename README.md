@@ -1,6 +1,6 @@
 # Dexe
 
-Dexe is a [hex editor](https://wiki.xxiivv.com/site/dexe.html), written in [Uxntal](https://wiki.xxiivv.com/site/uxntal.html).
+[Dexe](https://wiki.xxiivv.com/site/dexe.html) is a hex editor, written in [Uxntal](https://wiki.xxiivv.com/site/uxntal.html).
 
 ## Build
 
