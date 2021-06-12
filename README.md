@@ -13,6 +13,7 @@ uxnasm noodle.tal noodle.rom && uxnemu noodle.rom
 ## Controls
 
 - `arrows`, move selection
+- `ctrl+arrows`, move selection(fast)
 - `enter`, insert byte
 - `backspace`, delete byte
 - `left-click`, select bytes
