@@ -41,6 +41,8 @@
 %ASCII-FONT { TOS #0008 ** ;font-hex ++ }
 %RELEASE-MOUSE { #00 .Mouse/state DEO }
 %RESET-SELECTION { #0000 DUP2 .selection/from STZ2 .selection/to STZ2 }
+%SET-STATE   { #01 .state/changed STZ ;draw-state JSR2 }
+%RESET-STATE { #00 .state/changed STZ ;draw-state JSR2 }
 
 ( devices )
 
@@ -62,6 +64,10 @@
 	&timer $1
 	&trap $1
 	&blink $1
+	&changed $1
+@path 
+	&length $1
+	&name $20
 @pointer
 	&x $2 
 	&y $2
@@ -71,10 +77,9 @@
 	&to $2
 	&scroll $2
 	&nibble $1
-@path 
-	&length $1
-	&name $20
 @frame
+	&x $2 &y $2 &x2 $2 &y2 $2 
+@file-frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
 @byte-frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
@@ -101,17 +106,22 @@
 
 	( set size )
 	#0160 .Screen/width DEO2
-	#0160 .Screen/height DEO2
+	#0180 .Screen/height DEO2
 
 	( frame )
 	.Screen/width DEI2 2// #0088 -- DUP2 .frame/x STZ2
 		#0100 ++ .frame/x2 STZ2
-	.Screen/height DEI2 2// #0090 -- DUP2 .frame/y STZ2
+	.Screen/height DEI2 2// #00a0 -- DUP2 .frame/y STZ2
 		#0100 ++ .frame/y2 STZ2
 
 	.frame/x LDZ2 
-		DUP2 .byte-frame/x STZ2 #00c0 ++ .byte-frame/x2 STZ2
+		DUP2 .file-frame/x STZ2 #0100 ++ .file-frame/x2 STZ2
 	.frame/y LDZ2 
+		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
+
+	.frame/x LDZ2 
+		DUP2 .byte-frame/x STZ2 #00c0 ++ .byte-frame/x2 STZ2
+	.frame/y LDZ2 #0020 ++
 		DUP2 .byte-frame/y STZ2 #0100 ++ .byte-frame/y2 STZ2
 
 	.byte-frame/x2 LDZ2 
@@ -126,14 +136,10 @@
 
 	.frame/x LDZ2
 		DUP2 .menu-frame/x STZ2 #0100 ++ .menu-frame/x2 STZ2
-	.frame/y LDZ2 #0110 ++
+	.frame/y LDZ2 #0130 ++
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
-	( load bytes )
-	;untitled-txt .File/name DEO2
-	#1000         .File/length DEO2
-	;MEMORY       .File/load DEO2
-	.File/success DEI2 ;MEMORY-LEN STA2
+	;untitled-txt ;new-file JSR2
 
 	#0000 .scroll STZ2
 	;MEMORY ;select JSR2
@@ -141,6 +147,18 @@
 BRK
 
 @on-frame ( -> )
+	
+BRK
+
+@on-frame-trap ( -> )
+
+	( incr ) .state/timer LDZ INC DUP .state/timer STZ 
+
+	#08 ! ,&no-toggle JCN
+		.state/blink TOGGLE
+		#01 .state/blink LDZ 8* + ;draw-filepath JSR2
+		#00 .state/timer STZ 
+		&no-toggle
 	
 BRK
 
@@ -159,6 +177,35 @@ BRK
 	DUP #80 ! ,&no-right JCN
 		.selection/from LDZ2 #0001 ++ ;select JSR2
 		&no-right
+	POP
+
+BRK
+
+@on-button-trap ( -> )
+
+	.Controller/key DEI
+	DUP ,&continue JCN
+		POP BRK
+		&continue
+	DUP ( backspace ) #08 ! ,&no-edit-backspace JCN
+		( clamp ) .path/length LDZ #00 = ,&edit-end JCN
+		#00 ;draw-filepath JSR2
+		.path/length LDZ #01 - STHk .path/length STZ
+		#00 .path/name STHr + STZ
+		#01 ;draw-filepath JSR2 POP BRK
+		&no-edit-backspace
+	DUP ( special ) #20 > ,&no-edit-enter JCN
+		;on-frame .Screen/vector DEO2
+		;on-button .Controller/vector DEO2
+		#00 .state/blink STZ 
+		#01 ;draw-filepath JSR2 POP BRK
+		&no-edit-enter
+	( clamp ) .path/length LDZ #1f = ,&edit-end JCN
+	DUP .path/name .path/length LDZ STHk + STZ
+	STHr INC STHk .path/length STZ
+	#00 .path/name STHr + STZ
+	#01 ;draw-filepath JSR2
+	&edit-end
 	POP
 
 BRK
@@ -195,6 +242,8 @@ BRK
 		;on-touch-char JCN2
 	OVR2 OVR2 .tile-frame ;within-rect JSR2
 		;on-touch-tile JCN2
+	OVR2 OVR2 .file-frame ;within-rect JSR2
+		;on-touch-file JCN2
 	POP2 POP2
 	
 BRK
@@ -220,6 +269,12 @@ BRK
 @on-touch-tile ( x* y* -> )
 
 	POP2 POP2
+
+BRK
+
+@on-touch-file ( x* y* -> )
+
+	DEBUG2 DEBUG2
 
 BRK
 
@@ -276,17 +331,21 @@ RTN
 	#0010 #0000 
 	&loop
 		( addr ) DUP2 8** ;MEMORY ++ .scroll LDZ2 8** ++ STH2
-		( y ) DUP2 10** .frame/y LDZ2 ++
+		( y ) DUP2 10** .byte-frame/y LDZ2 ++
 		STH2r ;draw-row JSR2
 		INC2 GTH2k ,&loop JCN
 	POP2 POP2
 
-	;draw-menu JSR2
+	.file-frame/x LDZ2 .file-frame/x2 LDZ2 .file-frame/y2 LDZ2 #03 ;line-hor JSR2
 
-	( .byte-frame #01 ;line-rect JSR2
+	;draw-menu JSR2
+	( 
+	.file-frame #01 ;line-rect JSR2
+	.byte-frame #01 ;line-rect JSR2
 	.char-frame #02 ;line-rect JSR2
 	.tile-frame #03 ;line-rect JSR2
-	.menu-frame #03 ;line-rect JSR2 )
+	.menu-frame #03 ;line-rect JSR2
+	)
 
 RTN
 
@@ -376,8 +435,6 @@ RTN
 
 @draw-menu ( -- )
 
-	.menu-frame/x LDZ2 .menu-frame/x2 LDZ2 .menu-frame/y LDZ2 #0008 -- #03 ;line-hor JSR2
-
 	( start byte )
 	.selection/from LDZ2 ;MEMORY -- STH STH
 	.menu-frame/x LDZ2 .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
@@ -391,7 +448,96 @@ RTN
 	.menu-frame/x LDZ2 #0028 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
 	.menu-frame/x LDZ2 #0038 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
 
+	( filepath )
+	#01 ;draw-filepath JSR2
+
 RTN
+
+@draw-state ( -- )
+	
+		( 
+	.toolbar/x2 LDZ2 #0008 -- .Screen/x DEO2
+	.toolbar/y1 LDZ2 .Screen/y DEO2
+	;save-icn .Screen/addr DEO2
+	#01 .state/changed LDZ + .Screen/sprite DEO )
+
+RTN
+
+@draw-filepath ( color -- )
+	
+	STH
+	.file-frame/x LDZ2
+	.file-frame/y LDZ2 
+	;path/name STHr 
+		;draw-text JSR2
+
+RTN
+
+@draw-text ( x* y* addr* color -- )
+
+	#07 .Screen/auto DEO
+	STH
+	SWP2 .Screen/y DEO2
+	SWP2 .Screen/x DEO2
+	&while
+		LDAk ;char-addr JSR2 .Screen/addr DEO2
+		STHkr .Screen/sprite DEO
+		.Screen/x DEI2 #0008 -- .Screen/x DEO2
+		STHkr .Screen/sprite DEO
+		.Screen/y DEI2 #0010 -- .Screen/y DEO2
+		INC2 LDAk ,&while JCN
+	POP2
+	POPr
+	#00 .Screen/auto DEO
+
+RTN
+
+@char-addr ( char -- addr* )
+
+	#20 - TOS 10** ;font ++
+
+RTN
+
+( file )
+
+@new-file ( default* -- )
+
+	STH2
+	#0c #00
+	&loop
+		DUP DUP TOS STH2kr ++ LDA
+		SWP .path/name + STZ
+		INC GTHk ,&loop JCN
+	( end ) #00 SWP .path/name + STZ 
+	.path/length STZ 
+	POP2r
+	RESET-STATE
+	;redraw JSR2
+
+RTN
+
+@load-file ( -- )
+
+	( load bytes )
+	;path/name .File/name DEO2
+	#1000         .File/length DEO2
+	;MEMORY       .File/load DEO2
+	.File/success DEI2 ;MEMORY-LEN STA2
+	RESET-STATE
+	;redraw JSR2
+
+RTN
+
+@save-file ( -- )
+
+	;path/name .File/name DEO2 
+	;MEMORY-LEN LDA2 .File/length DEO2 
+	;MEMORY .File/save DEO2 
+	RESET-STATE
+
+RTN
+
+( generics )
 
 @line-hor ( x0* x1* y* color -- )
 
@@ -474,7 +620,7 @@ RTN
 	0002 0507 0a0c 0f11
 	1416 191b 1e20 2325
 
-@untitled-txt  "example.chr $1
+@untitled-txt  "untitled.chr $1
 @cursor-icn    80c0 e0f0 f8e0 1000
 
 @scrollbar_icn
