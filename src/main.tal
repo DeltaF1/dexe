@@ -21,6 +21,7 @@
 
 %RTN  { JMP2r }
 %SWP2? { #01 JCN SWP }
+%BRK? { #01 JCN BRK }
 
 %2*   { #10 SFT }
 %8*   { #30 SFT }
@@ -29,7 +30,7 @@
 %2**  { #10 SFT2 } %2// { #01 SFT2 }
 %4**  { #20 SFT2 } %4// { #02 SFT2 }
 %8**  { #30 SFT2 } %8// { #03 SFT2 }
-%10** { #40 SFT2 }
+%10** { #40 SFT2 } %10// { #04 SFT2 }
 
 %TOS  { #00 SWP } %TOB { SWP POP }
 %INCR { SWP #01 + SWP }
@@ -156,6 +157,8 @@ BRK
 	;cursor-icn .Screen/addr DEO2
 	.Mouse/state DEI #00 ! #41 + .Screen/sprite DEO
 
+	.Mouse/state DEI BRK?
+
 	.Mouse/x DEI2 .Mouse/y DEI2 
 	( begin with canvas )
 	OVR2 OVR2 .byte-frame ;within-rect JSR2
@@ -169,6 +172,13 @@ BRK
 BRK
 
 @on-touch-byte ( x* y* -> )
+
+	.byte-frame/y LDZ2 -- 10// NIP STH
+
+	.byte-frame/x LDZ2 -- 8// NIP #03 DIV STHr
+
+	DEBUG2
+
 
 BRK
 
