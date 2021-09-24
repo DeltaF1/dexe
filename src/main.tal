@@ -82,6 +82,8 @@
 	&x $2 &y $2 &x2 $2 &y2 $2 
 @tile-frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
+@menu-frame
+	&x $2 &y $2 &x2 $2 &y2 $2 
 
 ( program )
 
@@ -100,39 +102,39 @@
 	( set size )
 
 	( frame )
-	.Screen/width DEI2 2// #0080 -- DUP2 .frame/x STZ2
+	.Screen/width DEI2 2// #00a0 -- DUP2 .frame/x STZ2
 		#0100 ++ .frame/x2 STZ2
-	.Screen/height DEI2 2// #0080 -- DUP2 .frame/y STZ2
+	.Screen/height DEI2 2// #0090 -- DUP2 .frame/y STZ2
 		#0100 ++ .frame/y2 STZ2
 
 	.frame/x LDZ2 
-		DUP2 .byte-frame/x STZ2
-		#00c0 ++ .byte-frame/x2 STZ2
+		DUP2 .byte-frame/x STZ2 #00c0 ++ .byte-frame/x2 STZ2
 	.frame/y LDZ2 
-		DUP2 .byte-frame/y STZ2
-		#0100 ++ .byte-frame/y2 STZ2
+		DUP2 .byte-frame/y STZ2 #0100 ++ .byte-frame/y2 STZ2
 
 	.byte-frame/x2 LDZ2 
-		DUP2 .char-frame/x STZ2
-		#0040 ++ .char-frame/x2 STZ2
+		DUP2 .char-frame/x STZ2 #0040 ++ .char-frame/x2 STZ2
 	.byte-frame/y LDZ2 
-		DUP2 .char-frame/y STZ2
-		#0100 ++ .char-frame/y2 STZ2
+		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
 
 	.char-frame/x2 LDZ2 #0008 ++
-		DUP2 .tile-frame/x STZ2
-		#0008 ++ .tile-frame/x2 STZ2
+		DUP2 .tile-frame/x STZ2 #0008 ++ .tile-frame/x2 STZ2
 	.byte-frame/y LDZ2 
-		DUP2 .tile-frame/y STZ2
-		#0100 ++ .tile-frame/y2 STZ2
+		DUP2 .tile-frame/y STZ2 #0100 ++ .tile-frame/y2 STZ2
+
+	.frame/x LDZ2
+		DUP2 .menu-frame/x STZ2 #0100 ++ .menu-frame/x2 STZ2
+	.frame/y LDZ2 #0110 ++
+		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
 	( load bytes )
 	;untitled-txt .File/name DEO2
 	#1000         .File/length DEO2
 	;MEMORY       .File/load DEO2
+	.File/success DEI2 ;MEMORY-LEN STA2
 
 	#0000 .scroll STZ2
-	;redraw JSR2
+	;MEMORY ;select JSR2
 
 BRK
 
@@ -173,23 +175,50 @@ BRK
 
 @on-touch-byte ( x* y* -> )
 
-	.byte-frame/y LDZ2 -- 10// NIP STH
+	.byte-frame/y LDZ2 -- 10// NIP 8* STH
+	.byte-frame/x LDZ2 -- 8// NIP #03 DIV STHr +
 
-	.byte-frame/x LDZ2 -- 8// NIP #03 DIV STHr
-
-	DEBUG2
-
+	TOS ;MEMORY ++ ;select JSR2
 
 BRK
 
 @on-touch-char ( x* y* -> )
 
+	.char-frame/y LDZ2 -- 10// NIP 8* STH
+	.char-frame/x LDZ2 -- 8// NIP STHr +
+
+	TOS ;MEMORY ++ ;select JSR2
+
 BRK
 
 @on-touch-tile ( x* y* -> )
 
+	POP2 POP2
+
 BRK
 
+@select ( id* -- )
+
+	DUP2 .selection/from LDZ2 == ,&skip JCN
+	DUP2 .selection/from STZ2
+	.selection/to STZ2
+	;redraw JSR2
+	RTN
+	&skip
+	POP2
+
+RTN
+
+@is-selected ( id* -- flag )
+
+	DUP2 .selection/from LDZ2 == ,&yes JCN
+	STH2k .selection/from LDZ2 >> STH2r .selection/from LDZ2 << #0101 == ,&yes JCN
+		#00
+	RTN
+	&yes
+		POP2 #01 
+
+RTN
 
 @redraw ( -- )
 
@@ -201,6 +230,13 @@ BRK
 		INC2 GTH2k ,&loop JCN
 	POP2 POP2
 
+	;draw-menu JSR2
+
+	( .byte-frame #01 ;line-rect JSR2
+	.char-frame #02 ;line-rect JSR2
+	.tile-frame #03 ;line-rect JSR2
+	.menu-frame #03 ;line-rect JSR2 )
+
 RTN
 
 @draw-row ( y* id* -- )
@@ -210,7 +246,7 @@ RTN
 
 	#08 #00
 	&bytes-loop
-		( color ) #01 STH
+		( color ) DUP TOS ;&row LDA2 ++ ;is-selected JSR2 #07 MUL #01 + STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
 		( x-block ) DUP #03 MUL TOS 8** .frame/x LDZ2 ++
@@ -220,7 +256,7 @@ RTN
 
 	#08 #00
 	&chars-loop
-		( color ) #01 STH
+		( color ) DUP TOS ;&row LDA2 ++ ;is-selected JSR2 #07 MUL #01 + STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
 		( x-block ) DUP TOS 8** .frame/x LDZ2 ++ #00c0 ++
@@ -271,12 +307,49 @@ RTN
 	STH STH
 	.Screen/y DEO2
 	.Screen/x DEO2
-	STHr #7f AND
-	#20 - TOS 10** ;font ++ .Screen/addr DEO2
+	STHr
+
+	DUP #1f > OVR #80 < #0101 == ,&visible JCN
+		POP ;font #000e 10** ++ ,&resume JMP
+	&visible
+		#20 - TOS 10** ;font ++
+	&resume
+	.Screen/addr DEO2
+	
 	STHkr .Screen/sprite DEO
 	STHr .Screen/sprite DEO
 
 	#00 .Screen/auto DEO
+
+RTN
+
+@draw-menu ( -- )
+
+	.menu-frame/x LDZ2 .menu-frame/x2 LDZ2 .menu-frame/y LDZ2 #0008 -- #03 ;line-hor JSR2
+
+	( start byte )
+	.selection/from LDZ2 ;MEMORY -- STH STH
+	.menu-frame/x LDZ2 .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+	.menu-frame/x LDZ2 #0010 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+
+	( / )
+	.menu-frame/x LDZ2 #0020 ++ .menu-frame/y LDZ2 LIT '/ #03 ;draw-char JSR2
+
+	( end byte )
+	;MEMORY-LEN LDA2 STH STH
+	.menu-frame/x LDZ2 #0028 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+	.menu-frame/x LDZ2 #0038 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+
+RTN
+
+@line-hor ( x0* x1* y* color -- )
+
+	STH .Screen/y DEO2 SWP2
+	&loop
+		( save ) DUP2 .Screen/x DEO2
+		( draw ) STHkr .Screen/pixel DEO
+		#0002 ++ GTH2k ,&loop JCN
+	POP2 POP2 POPr
 
 RTN
 
