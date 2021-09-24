@@ -48,7 +48,7 @@
 |10 @Console    &vector $2 &read    $1 &pad    $5 &write $1 
 |20 @Screen     &vector $2 &width   $2 &height $2 &auto  $1 &pad   $1 &x     $2 &y $2 &addr $2 &pixel $1 &sprite $1
 |80 @Controller &vector $2 &button  $1 &key    $1
-|90 @Mouse      &vector $2 &x       $2 &y      $2 &state $1 &chord $1 &wheel $1
+|90 @Mouse      &vector $2 &x       $2 &y      $2 &state $1 &wheel $1
 |a0 @File       &vector $2 &success $2 &offset $2 &pad   $2 &name  $2 &length $2 &load $2 &save $2
 
 ( variables )
@@ -100,9 +100,11 @@
 	;on-frame    .Screen/vector DEO2
 
 	( set size )
+	#0160 .Screen/width DEO2
+	#0160 .Screen/height DEO2
 
 	( frame )
-	.Screen/width DEI2 2// #00a0 -- DUP2 .frame/x STZ2
+	.Screen/width DEI2 2// #0088 -- DUP2 .frame/x STZ2
 		#0100 ++ .frame/x2 STZ2
 	.Screen/height DEI2 2// #0090 -- DUP2 .frame/y STZ2
 		#0100 ++ .frame/y2 STZ2
@@ -144,6 +146,21 @@ BRK
 
 @on-button ( -> )
 
+	.Controller/button DEI
+	DUP #10 ! ,&no-up JCN
+		.selection/from LDZ2 #0008 -- ;select JSR2
+		&no-up
+	DUP #20 ! ,&no-down JCN
+		.selection/from LDZ2 #0008 ++ ;select JSR2
+		&no-down
+	DUP #40 ! ,&no-left JCN
+		.selection/from LDZ2 #0001 -- ;select JSR2
+		&no-left
+	DUP #80 ! ,&no-right JCN
+		.selection/from LDZ2 #0001 ++ ;select JSR2
+		&no-right
+	POP
+
 BRK
 
 @on-mouse ( -> )
@@ -158,6 +175,15 @@ BRK
 	.Mouse/y DEI2 DUP2 .cursor/y STZ2 .Screen/y DEO2
 	;cursor-icn .Screen/addr DEO2
 	.Mouse/state DEI #00 ! #41 + .Screen/sprite DEO
+
+	.Mouse/wheel DEI 
+	DUP #01 ! ,&no-up JCN
+		.selection/from LDZ2 #0008 -- ;select JSR2
+		&no-up
+	DUP #ff ! ,&no-down JCN
+		.selection/from LDZ2 #0008 ++ ;select JSR2
+		&no-down
+	POP
 
 	.Mouse/state DEI BRK?
 
@@ -178,7 +204,7 @@ BRK
 	.byte-frame/y LDZ2 -- 10// NIP 8* STH
 	.byte-frame/x LDZ2 -- 8// NIP #03 DIV STHr +
 
-	TOS ;MEMORY ++ ;select JSR2
+	TOS ;MEMORY ++ [ .scroll LDZ2 8** ++ ] ;select JSR2
 
 BRK
 
@@ -187,7 +213,7 @@ BRK
 	.char-frame/y LDZ2 -- 10// NIP 8* STH
 	.char-frame/x LDZ2 -- 8// NIP STHr +
 
-	TOS ;MEMORY ++ ;select JSR2
+	TOS ;MEMORY ++ [ .scroll LDZ2 8** ++ ] ;select JSR2
 
 BRK
 
@@ -200,12 +226,37 @@ BRK
 @select ( id* -- )
 
 	DUP2 .selection/from LDZ2 == ,&skip JCN
+	DUP2 ;MEMORY << ,&skip JCN
+	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ >> ,&skip JCN
+	( valid )
 	DUP2 .selection/from STZ2
 	.selection/to STZ2
+	;follow JSR2
 	;redraw JSR2
 	RTN
 	&skip
 	POP2
+
+RTN
+
+@follow ( -- )
+
+	.selection/from LDZ2 ;MEMORY .scroll LDZ2 8** ++ << ,&up JCN
+	.selection/to LDZ2 ;MEMORY #007f ++ .scroll LDZ2 8** ++  >> ,&down JCN
+	RTN
+
+	&up
+		.selection/from LDZ2 #0001 -- ;scroll-to JSR2 
+		RTN
+
+	&down
+		.selection/to LDZ2 #0080 -- #0008 ++ ;scroll-to JSR2
+
+RTN
+
+@scroll-to ( addr* -- )
+
+	;MEMORY -- 8// .scroll STZ2
 
 RTN
 
@@ -224,7 +275,7 @@ RTN
 
 	#0010 #0000 
 	&loop
-		( addr ) DUP2 8** ;MEMORY ++ STH2
+		( addr ) DUP2 8** ;MEMORY ++ .scroll LDZ2 8** ++ STH2
 		( y ) DUP2 10** .frame/y LDZ2 ++
 		STH2r ;draw-row JSR2
 		INC2 GTH2k ,&loop JCN
