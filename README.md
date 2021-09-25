@@ -1,7 +1,6 @@
-ABCDEF123456
 # Dexe
 
-[Dexe](https://wiki.xxiivv.com/site/dexe.html) is a hex editor, written in [Uxntal](https://wiki.xxiivv.com/site/uxntal.html).
+[Dexe](https://wiki.xxiivv.com/site/dexe.html) is a simple hex editor, written in [Uxntal](https://wiki.xxiivv.com/site/uxntal.html).
 
 ## Build
 
@@ -13,8 +12,22 @@ uxnasm noodle.tal noodle.rom && uxnemu noodle.rom
 
 ## Controls
 
+### File
+
+- `ctrl+r` edit filenname
+- `ctrl+R` erase filenname
+- `ctrl+o` open file
+- `ctrl+s` save file
+
+### Edit
+
+- `ctrl+c` copy selection
+- `ctrl+C` copy selection(text mode)
+- `ctrl+v` paste selection
+
+### General
+
 - `arrows`, move selection
-- `ctrl+arrows`, move selection(fast)
+- `shift-arrows`, move selection
 - `enter`, insert byte
 - `backspace`, delete byte
-- `left-click`, select bytes
