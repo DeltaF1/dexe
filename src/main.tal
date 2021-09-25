@@ -138,8 +138,6 @@
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
 	;untitled-txt ;new-file JSR2
-
-	#0000 .scroll STZ2
 	;MEMORY ;select JSR2
 
 BRK
@@ -191,6 +189,12 @@ BRK
 @on-button ( -> )
 
 	.Controller/button DEI
+	DUP #44 ! ,&no-left-sel JCN
+		.selection/to LDZ2 #0001 -- ;select-until JSR2 POP BRK
+		&no-left-sel
+	DUP #84 ! ,&no-right-sel JCN
+		.selection/to LDZ2 #0001 ++ ;select-until JSR2 POP BRK
+		&no-right-sel
 	DUP #10 ! ,&no-up JCN
 		.selection/from LDZ2 #0008 -- ;select JSR2 POP BRK
 		&no-up
@@ -206,6 +210,12 @@ BRK
 
 	( ctrl )
 	#01 = ;on-control JCN2
+
+	.Controller/key DEI
+	DUP #1b ! ,&no-esc JCN
+		;reset-selection JSR2 POP BRK
+		&no-esc
+	POP
 
 BRK
 
@@ -348,11 +358,11 @@ BRK
 
 	DUP2 .selection/from LDZ2 == ,&skip JCN
 	DUP2 ;MEMORY << ,&skip JCN
-	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ >> ,&skip JCN
+	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ #0001 -- >> ,&skip JCN
 	( valid )
 	DUP2 .selection/from STZ2
 	.selection/to STZ2
-	;follow JSR2
+	;follow-selection JSR2
 	;redraw JSR2
 	RTN
 	&skip
@@ -360,7 +370,25 @@ BRK
 
 RTN
 
-@follow ( -- )
+@select-until ( id* -- )
+
+	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ << ,&valid JCN
+		POP2 RTN
+		&valid
+
+	.selection/to STZ2
+
+	( clamp )
+	.selection/to LDZ2 .selection/from LDZ2 >> ,&not-before JCN
+		.selection/from LDZ2 .selection/to STZ2
+		&not-before
+	
+	;follow-selection JSR2
+	;redraw JSR2
+
+RTN
+
+@follow-selection ( -- )
 
 	.selection/from LDZ2 ;MEMORY .scroll LDZ2 8** ++ << ,&up JCN
 	.selection/to LDZ2 ;MEMORY #007f ++ .scroll LDZ2 8** ++  >> ,&down JCN
@@ -375,6 +403,13 @@ RTN
 
 RTN
 
+@reset-selection ( -- )
+
+	.selection/from LDZ2 .selection/to STZ2
+	;redraw JSR2
+
+RTN
+
 @scroll-to ( addr* -- )
 
 	;MEMORY -- 8// .scroll STZ2
@@ -383,12 +418,16 @@ RTN
 
 @is-selected ( id* -- flag )
 
-	DUP2 .selection/from LDZ2 == ,&yes JCN
-	STH2k .selection/from LDZ2 >> STH2r .selection/from LDZ2 << #0101 == ,&yes JCN
-		#00
-	RTN
-	&yes
-		POP2 #01 
+	DUP2 .selection/from LDZ2 !! ,&continue JCN
+		POP2 #01 RTN
+		&continue
+	DUP2 .selection/from LDZ2 >> ,&gt JCN
+		POP2 #00 RTN
+		&gt
+	DUP2 .selection/to LDZ2 #0001 ++ << ,&lt JCN
+		POP2 #00 RTN
+		&lt
+	POP2 #01
 
 RTN
 
@@ -422,7 +461,7 @@ RTN
 
 	#08 #00
 	&bytes-loop
-		( color ) DUP TOS ;&row LDA2 ++ ;is-selected JSR2 #07 MUL #01 + STH
+		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
 		( x-block ) DUP #03 MUL TOS 8** .frame/x LDZ2 ++
@@ -432,7 +471,7 @@ RTN
 
 	#08 #00
 	&chars-loop
-		( color ) DUP TOS ;&row LDA2 ++ ;is-selected JSR2 #07 MUL #01 + STH
+		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
 		( x-block ) DUP TOS 8** .frame/x LDZ2 ++ #00c0 ++
@@ -447,6 +486,16 @@ RTN
 
 RTN
 	&y $2 &row $2
+
+@get-byte-color ( id* )
+
+	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ << ,&exists JCN
+		POP2 #03 RTN
+		&exists
+
+	;is-selected JSR2 #07 MUL #01 +
+
+RTN
 
 @draw-byte ( x* y* byte color -- )
 
@@ -488,7 +537,7 @@ RTN
 	DUP #1f > OVR #80 < #0101 == ,&visible JCN
 		POP ;font #000e 10** ++ ,&resume JMP
 	&visible
-		#20 - TOS 10** ;font ++
+		;char-addr JSR2
 	&resume
 	.Screen/addr DEO2
 	
@@ -510,7 +559,7 @@ RTN
 	.menu-frame/x LDZ2 #0020 ++ .menu-frame/y LDZ2 LIT '/ #03 ;draw-char JSR2
 
 	( end byte )
-	;MEMORY-LEN LDA2 STH STH
+	;MEMORY-LEN LDA2 #0001 -- STH STH
 	.menu-frame/x LDZ2 #0028 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
 	.menu-frame/x LDZ2 #0038 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
 
@@ -559,9 +608,22 @@ RTN
 
 RTN
 
+@clear ( -- )
+
+	;MEMORY DUP2 #8000 ++ SWP2
+	&loop
+		DUP2 #00 ROT ROT STA
+		INC2 GTH2k ,&loop JCN
+	POP2 POP2
+
+RTN
+
 ( file )
 
 @new-file ( default* -- )
+
+	( clear )
+	;clear JSR2
 
 	STH2
 	#0c #00
@@ -573,6 +635,8 @@ RTN
 	.path/length STZ 
 	POP2r
 	RESET-STATE
+	#0000 .scroll STZ2
+	#0008 ;MEMORY-LEN STA2
 	;redraw JSR2
 
 RTN
@@ -581,7 +645,7 @@ RTN
 
 	( load bytes )
 	;path/name .File/name DEO2
-	#1000         .File/length DEO2
+	#8000         .File/length DEO2
 	;MEMORY       .File/load DEO2
 	.File/success DEI2 ;MEMORY-LEN STA2
 	RESET-STATE
