@@ -209,7 +209,7 @@ BRK
 		&no-right
 
 	( ctrl )
-	#01 = ;on-control JCN2
+	#01 AND ;on-control JCN2
 
 	.Controller/key DEI
 	DUP #1b ! ,&no-esc JCN
@@ -632,6 +632,7 @@ RTN
 
 	( clear )
 	;clear JSR2
+	;MEMORY ;select JSR2
 
 	STH2
 	#0c #00
