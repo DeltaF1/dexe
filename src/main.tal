@@ -24,7 +24,8 @@
 %BRK? { #01 JCN BRK }
 
 %2*   { #10 SFT }
-%8*   { #30 SFT }
+%4*   { #20 SFT } %4/   { #02 SFT }
+%8*   { #30 SFT } %8/   { #03 SFT }
 %20*  { #50 SFT } 
 %40*  { #60 SFT }
 %2**  { #10 SFT2 } %2// { #01 SFT2 }
@@ -324,6 +325,8 @@ BRK
 		;on-touch-tile JCN2
 	OVR2 OVR2 .file-frame ;within-rect JSR2
 		;on-touch-file JCN2
+	OVR2 OVR2 .menu-frame ;within-rect JSR2
+		;on-touch-menu JCN2
 	POP2 POP2
 	
 BRK
@@ -366,6 +369,29 @@ BRK
 	POP2 POP2
 	#00 ;draw-filepath JSR2 
 	;trap JSR2
+
+BRK
+
+@on-touch-menu ( x* y* -> )
+
+	.menu-frame/y LDZ2 -- 8// NIP STH
+	.menu-frame/x LDZ2 -- 8// NIP STHr
+
+	( bitpad )
+	OVR #20 < ;on-touch-menu-bitpad JCN2
+
+	DEBUG2
+
+BRK
+
+@on-touch-menu-bitpad ( x* y* -> )
+
+	4* + #07 SWP - #40 SFT #01 SWP SFT
+	.selection/from LDZ2 LDA
+	SWP EOR
+	.selection/from LDZ2 STA
+	;redraw JSR2
+	RELEASE-MOUSE
 
 BRK
 
@@ -612,6 +638,31 @@ RTN
 	( filepath )
 	#01 ;draw-filepath JSR2
 
+	;draw-bitpad JSR2
+
+RTN
+
+@draw-bitpad ( -- )
+
+	#08 #00
+	&loop
+		( state ) DUP #07 SWP - [ .selection/from LDZ2 LDA ] SWP SFT #01 AND STH
+		( y ) DUP 4/ TOS 8** .menu-frame/y LDZ2 ++ STH2
+		( x ) DUP #03 AND TOS 8** .menu-frame/x LDZ2 ++
+		STH2r STHr #01 ,draw-bit JSR
+		INC GTHk ,&loop JCN
+	POP2
+
+RTN
+
+@draw-bit ( x* y* state color -- )
+
+	STH
+	( addr ) 8* TOS ;bit-icns ++ .Screen/addr DEO2 
+	( y ) .Screen/y DEO2
+	( x ) .Screen/x DEO2
+	STHr .Screen/sprite DEO	
+
 RTN
 
 @draw-state ( -- )
@@ -823,6 +874,9 @@ RTN
 @byte-spacing
 	0002 0507 0a0c 0f11
 	1416 191b 1e20 2325
+@bit-icns
+	3844 8282 8244 3800
+	387c fefe fe7c 3800
 
 @untitled-txt  "untitled.chr $1
 @cursor-icn    80c0 e0f0 f8e0 1000
