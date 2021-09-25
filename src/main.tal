@@ -213,6 +213,15 @@ BRK
 	DUP #1b ! ,&no-esc JCN
 		;reset-selection JSR2 POP BRK
 		&no-esc
+	DUP #1f > OVR #7f < #0101 !! ,&no-char JCN
+		DUP ;fill-selection JSR2
+		&no-char
+	DUP #0d ! ,&no-enter JCN
+		.selection/from LDZ2 ;memsftr JSR2
+		&no-enter
+	DUP #08 ! ,&no-backspace JCN
+		.selection/from LDZ2 ;memsftl JSR2
+		&no-backspace
 	POP
 
 BRK
@@ -409,6 +418,18 @@ RTN
 
 RTN
 
+@fill-selection ( char -- )
+
+	STH
+	.selection/to LDZ2 INC2 .selection/from LDZ2
+	&loop
+		DUP2 STHkr ROT ROT STA
+		INC2 GTH2k ,&loop JCN
+	POP2 POP2 POPr
+	;redraw JSR2
+
+RTN
+
 @reset-selection ( -- )
 
 	.selection/from LDZ2 .selection/to STZ2
@@ -434,6 +455,38 @@ RTN
 		POP2 #00 RTN
 		&lt
 	POP2 #01
+
+RTN
+
+@memsftl ( addr* -- )
+
+	DUP2 INC2 MEMORY .data/length LDZ2 ++ !! ,&can-shift JCN
+		POP2 RTN
+		&can-shift
+
+	MEMORY .data/length LDZ2 ++ SWP2
+	&loop
+		( a ) INC2k LDA STH
+		( b ) DUP2 STHr ROT ROT STA
+		INC2 GTH2k ,&loop JCN
+	POP2 POP2
+
+	.data/length LDZ2 #0001 -- .data/length STZ2
+	;redraw JSR2
+
+RTN
+
+@memsftr ( addr* -- )
+
+	#0001 -- MEMORY .data/length LDZ2 ++
+	&loop
+		( a ) LDAk STH
+		( b ) INC2k STHr ROT ROT STA
+		#0001 -- LTH2k ,&loop JCN
+	POP2 POP2
+
+	.data/length LDZ2 INC2 .data/length STZ2
+	;redraw JSR2
 
 RTN
 
@@ -784,4 +837,7 @@ RTN
 	007c 8280 8080 827c 00fc 8282 8282 82fc
 	007c 8280 f080 827c 007c 8280 f080 8080 
 
+
 include src/font.tal
+
+@text-snarf $100
