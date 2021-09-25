@@ -100,9 +100,7 @@
 	#0f97 .System/b DEO2
 
 	( vectors ) 
-	;on-button .Controller/vector DEO2
-	;on-mouse .Mouse/vector DEO2
-	;on-frame    .Screen/vector DEO2
+	;untrap JSR2
 
 	( set size )
 	#0160 .Screen/width DEO2
@@ -146,6 +144,34 @@
 
 BRK
 
+@untrap ( -- )
+	
+	( vectors ) 
+	;on-frame .Screen/vector DEO2
+	;on-button .Controller/vector DEO2
+	;on-mouse .Mouse/vector DEO2
+
+	( filepath )
+	#00 .state/blink STZ 
+	#01 ;draw-filepath JSR2
+	RELEASE-MOUSE
+
+RTN
+
+@trap ( -- )
+
+	( vectors ) 
+	;on-frame-trap .Screen/vector DEO2
+	;on-button-trap .Controller/vector DEO2
+	;on-mouse-trap .Mouse/vector DEO2
+
+	( filepath )
+	#01 .state/blink STZ 
+	#01 ;draw-filepath JSR2
+	RELEASE-MOUSE
+
+RTN
+
 @on-frame ( -> )
 	
 BRK
@@ -166,18 +192,50 @@ BRK
 
 	.Controller/button DEI
 	DUP #10 ! ,&no-up JCN
-		.selection/from LDZ2 #0008 -- ;select JSR2
+		.selection/from LDZ2 #0008 -- ;select JSR2 POP BRK
 		&no-up
 	DUP #20 ! ,&no-down JCN
-		.selection/from LDZ2 #0008 ++ ;select JSR2
+		.selection/from LDZ2 #0008 ++ ;select JSR2 POP BRK
 		&no-down
 	DUP #40 ! ,&no-left JCN
-		.selection/from LDZ2 #0001 -- ;select JSR2
+		.selection/from LDZ2 #0001 -- ;select JSR2 POP BRK
 		&no-left
 	DUP #80 ! ,&no-right JCN
-		.selection/from LDZ2 #0001 ++ ;select JSR2
+		.selection/from LDZ2 #0001 ++ ;select JSR2 POP BRK
 		&no-right
-	POP
+
+	( ctrl )
+	#01 = ;on-control JCN2
+
+BRK
+
+@on-control ( -> )
+	
+	.Controller/key DEI
+	DUP [ LIT 'r ] ! ,&no-name JCN
+		#00 ;draw-filepath JSR2 
+		;trap JSR2
+		POP BRK
+		&no-name
+	DUP [ LIT 'R ] ! ,&no-rename JCN
+		#00 ;draw-filepath JSR2 
+		#00 .Controller/key DEO
+		#00 .path/length STZ
+		#0000 .path/name STZ2
+		;trap JSR2
+		POP BRK
+		&no-rename
+	DUP [ LIT 'n ] ! ,&no-new JCN
+		#25 ;draw-filepath JSR2
+		;untitled-txt ;new-file JSR2
+		;redraw JSR2 POP BRK &no-new
+	DUP [ LIT 'o ] ! ,&no-open JCN
+		;load-file JSR2
+		;redraw JSR2 POP BRK &no-open
+	DUP [ LIT 's ] ! ,&no-save JCN
+		;path/name ;save-file JSR2 
+		POP BRK  &no-save
+	POP 
 
 BRK
 
@@ -195,10 +253,7 @@ BRK
 		#01 ;draw-filepath JSR2 POP BRK
 		&no-edit-backspace
 	DUP ( special ) #20 > ,&no-edit-enter JCN
-		;on-frame .Screen/vector DEO2
-		;on-button .Controller/vector DEO2
-		#00 .state/blink STZ 
-		#01 ;draw-filepath JSR2 POP BRK
+		;untrap JSR2 POP BRK
 		&no-edit-enter
 	( clamp ) .path/length LDZ #1f = ,&edit-end JCN
 	DUP .path/name .path/length LDZ STHk + STZ
@@ -248,6 +303,15 @@ BRK
 	
 BRK
 
+@on-mouse-trap ( -> )
+
+	( release trap on touch )
+	.Mouse/state DEI BRK?
+
+	;untrap JSR2
+	
+BRK
+
 @on-touch-byte ( x* y* -> )
 
 	.byte-frame/y LDZ2 -- 10// NIP 8* STH
@@ -274,7 +338,9 @@ BRK
 
 @on-touch-file ( x* y* -> )
 
-	DEBUG2 DEBUG2
+	POP2 POP2
+	#00 ;draw-filepath JSR2 
+	;trap JSR2
 
 BRK
 
@@ -345,7 +411,7 @@ RTN
 	.char-frame #02 ;line-rect JSR2
 	.tile-frame #03 ;line-rect JSR2
 	.menu-frame #03 ;line-rect JSR2
-	)
+	 )
 
 RTN
 
@@ -455,11 +521,6 @@ RTN
 
 @draw-state ( -- )
 	
-		( 
-	.toolbar/x2 LDZ2 #0008 -- .Screen/x DEO2
-	.toolbar/y1 LDZ2 .Screen/y DEO2
-	;save-icn .Screen/addr DEO2
-	#01 .state/changed LDZ + .Screen/sprite DEO )
 
 RTN
 
