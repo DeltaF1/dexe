@@ -220,8 +220,9 @@ BRK
 BRK
 
 @on-control ( -> )
-	
+
 	.Controller/key DEI
+	( file )
 	DUP [ LIT 'r ] ! ,&no-name JCN
 		#00 ;draw-filepath JSR2 
 		;trap JSR2
@@ -245,6 +246,13 @@ BRK
 	DUP [ LIT 's ] ! ,&no-save JCN
 		;path/name ;save-file JSR2 
 		POP BRK  &no-save
+	( snarf )
+	DUP [ LIT 'c ] ! ,&no-copy JCN
+		;copy-snarf JSR2 POP BRK
+		&no-copy
+	DUP [ LIT 'v ] ! ,&no-paste JCN
+		;paste-snarf JSR2 POP BRK
+		&no-paste
 	POP 
 
 BRK
@@ -659,6 +667,27 @@ RTN
 	;MEMORY-LEN LDA2 .File/length DEO2 
 	;MEMORY .File/save DEO2 
 	RESET-STATE
+
+RTN
+
+( snarf )
+
+@snarf-txt ".snarf $1
+
+@copy-snarf ( -- )
+
+	;snarf-txt .File/name DEO2 
+	.selection/to LDZ2 .selection/from LDZ2 -- INC2 .File/length DEO2 
+	.selection/from LDZ2 .File/save DEO2
+
+RTN
+
+@paste-snarf ( -- )
+
+	;snarf-txt .File/name DEO2
+	#8000 .File/length DEO2
+	.selection/from LDZ2 .File/load DEO2
+	;redraw JSR2
 
 RTN
 
