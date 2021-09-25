@@ -36,17 +36,14 @@
 %TOS  { #00 SWP } %TOB { SWP POP }
 %INCR { SWP #01 + SWP }
 %TOGGLE { DUP LDZ #00 = SWP STZ }
-%INCR2 { SWP2 #0001 ++ SWP2 }
-%DECR2 { SWP2 #0001 -- SWP2 }
+%GET-ITER { OVR2 NIP OVR SWP }
 
-%ASCII-FONT { TOS #0008 ** ;font-hex ++ }
 %RELEASE-MOUSE { #00 .Mouse/state DEO }
-%RESET-SELECTION { #0000 DUP2 .selection/from STZ2 .selection/to STZ2 }
 %SET-STATE   { #01 .state/changed STZ ;draw-state JSR2 }
 %RESET-STATE { #00 .state/changed STZ ;draw-state JSR2 }
 
 %MEMORY { #8000 }
-%MEMORY-SIZE { #8000 }
+%MEMORY-SIZE { #7000 }
 
 ( devices )
 
@@ -112,7 +109,7 @@
 		#0100 ++ .frame/y2 STZ2
 
 	.frame/x LDZ2 
-		DUP2 .file-frame/x STZ2 #0100 ++ .file-frame/x2 STZ2
+		DUP2 .file-frame/x STZ2 #0118 ++ .file-frame/x2 STZ2
 	.frame/y LDZ2 
 		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
 
@@ -121,7 +118,7 @@
 	.frame/y LDZ2 #0020 ++
 		DUP2 .byte-frame/y STZ2 #0100 ++ .byte-frame/y2 STZ2
 
-	.byte-frame/x2 LDZ2 
+	.byte-frame/x2 LDZ2 #0018 ++
 		DUP2 .char-frame/x STZ2 #0040 ++ .char-frame/x2 STZ2
 	.byte-frame/y LDZ2 
 		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
@@ -258,6 +255,9 @@ BRK
 	DUP [ LIT 'c ] ! ,&no-copy JCN
 		;copy-snarf JSR2 POP BRK
 		&no-copy
+	DUP [ LIT 'C ] ! ,&no-copy-string JCN
+		;copy-string-snarf JSR2 POP BRK
+		&no-copy-string
 	DUP [ LIT 'v ] ! ,&no-paste JCN
 		;paste-snarf JSR2 POP BRK
 		&no-paste
@@ -559,28 +559,18 @@ RTN
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
-		( x-block ) DUP TOS 8** .frame/x LDZ2 ++ #00c0 ++
+		( x-block ) DUP TOS 8** .frame/x LDZ2 ++ #00d8 ++
 		STH2r STHr STHr ;draw-char JSR2
 		INC GTHk ,&chars-loop JCN
 	POP2
 
-	.Screen/y DEI2 #0010 -- .Screen/y DEO2
-	#0108 .frame/x LDZ2 ++ .Screen/x DEO2
-	;&row LDA2 .Screen/addr DEO2
-	#01 .Screen/sprite DEO
+	.frame/x LDZ2 #00c0 ++ 
+	.Screen/y DEI2 #0010 -- 
+	;&row LDA2 #01
+		;draw-tile JSR2
 
 RTN
 	&y $2 &row $2
-
-@get-byte-color ( id* )
-
-	DUP2 MEMORY .data/length LDZ2 ++ << ,&exists JCN
-		POP2 #03 RTN
-		&exists
-
-	;is-selected JSR2 #07 MUL #01 +
-
-RTN
 
 @draw-byte ( x* y* byte color -- )
 
@@ -632,6 +622,34 @@ RTN
 	#00 .Screen/auto DEO
 
 RTN
+
+@draw-tile ( x* y* addr* color -- )
+
+	POP
+	;&addr STA2
+	;&y STA2
+	;&x STA2
+
+	#08 #00
+	&ver
+		DUP 2* TOS ;&y LDA2 ++ .Screen/y DEO2
+		#08 #00
+		&hor
+			DUP 2* TOS ;&x LDA2 ++ .Screen/x DEO2
+			( get pixel )
+			GET-ITER
+			( ch 1 )
+			TOS ;&addr LDA2 ++ LDA
+			SWP #07 SWP - SFT #01 AND
+			.Screen/pixel DEO
+			INC GTHk ,&hor JCN
+		POP2
+		INC GTHk ,&ver JCN
+	POP2
+
+
+RTN
+	&x $2 &y $2 &addr $2
 
 @draw-menu ( -- )
 
@@ -710,6 +728,15 @@ RTN
 
 RTN
 
+@get-byte-color ( id* )
+
+	DUP2 MEMORY .data/length LDZ2 ++ << ,&exists JCN
+		POP2 #03 RTN
+		&exists
+	;is-selected JSR2 #07 MUL #01 +
+
+RTN
+
 @char-addr ( char -- addr* )
 
 	#20 - TOS 10** ;font ++
@@ -780,6 +807,27 @@ RTN
 	;snarf-txt .File/name DEO2 
 	.selection/to LDZ2 .selection/from LDZ2 -- INC2 .File/length DEO2 
 	.selection/from LDZ2 .File/save DEO2
+
+RTN
+
+@copy-string-snarf ( -- )
+
+	;string-snarf/data STH2
+	.selection/to LDZ2 INC2 .selection/from LDZ2
+	&loop
+		( convert byte to string )
+		( get char ) LDAk #04 SFT ;print-hex/parse JSR2 
+		( store ) STH2kr STA INC2r
+		( get char ) LDAk #0f AND ;print-hex/parse JSR2 
+		( store ) STH2kr STA INC2r
+		#20 STH2kr STA INC2r
+		INC2 GTH2k ,&loop JCN
+	POP2 POP2
+	STH2r ;string-snarf/data -- ;string-snarf/length STA2
+
+	;snarf-txt .File/name DEO2 
+	;string-snarf/length LDA2 .File/length DEO2 
+	;string-snarf/data .File/save DEO2
 
 RTN
 
@@ -871,15 +919,13 @@ RTN
 
 RTN
 
-@byte-spacing
-	0002 0507 0a0c 0f11
-	1416 191b 1e20 2325
+@cursor-icn    
+	80c0 e0f0 f8e0 1000
 @bit-icns
 	3844 8282 8244 3800
 	387c fefe fe7c 3800
 
 @untitled-txt  "untitled.chr $1
-@cursor-icn    80c0 e0f0 f8e0 1000
 
 @font-hex
 	007c 8282 8282 827c 0030 1010 1010 1010
@@ -894,4 +940,6 @@ RTN
 
 include src/font.tal
 
-@text-snarf $100
+@string-snarf
+	&length $2
+	&data $100
