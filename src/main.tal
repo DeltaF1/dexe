@@ -44,6 +44,9 @@
 %SET-STATE   { #01 .state/changed STZ ;draw-state JSR2 }
 %RESET-STATE { #00 .state/changed STZ ;draw-state JSR2 }
 
+%MEMORY { #8000 }
+%MEMORY-SIZE { #8000 }
+
 ( devices )
 
 |00 @System     &vector $2 &pad     $6 &r      $2 &g     $2 &b     $2
@@ -57,26 +60,21 @@
 
 |0000
 
-@scroll $2
+@data
+	&length $2
 @cursor 
 	&x $2 &y $2 
 @state
 	&timer $1
-	&trap $1
 	&blink $1
 	&changed $1
 @path 
 	&length $1
 	&name $20
-@pointer
-	&x $2 
-	&y $2
-	&last $1
 @selection
 	&from $2
 	&to $2
 	&scroll $2
-	&nibble $1
 @frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
 @file-frame
@@ -138,7 +136,7 @@
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
 	;untitled-txt ;new-file JSR2
-	;MEMORY ;select JSR2
+	MEMORY ;select JSR2
 
 BRK
 
@@ -335,7 +333,7 @@ BRK
 	.byte-frame/y LDZ2 -- 10// NIP 8* STH
 	.byte-frame/x LDZ2 -- 8// NIP #03 DIV STHr +
 
-	TOS ;MEMORY ++ [ .scroll LDZ2 8** ++ ] ;select JSR2
+	TOS MEMORY ++ [ .selection/scroll LDZ2 8** ++ ] ;select JSR2
 
 BRK
 
@@ -344,7 +342,7 @@ BRK
 	.char-frame/y LDZ2 -- 10// NIP 8* STH
 	.char-frame/x LDZ2 -- 8// NIP STHr +
 
-	TOS ;MEMORY ++ [ .scroll LDZ2 8** ++ ] ;select JSR2
+	TOS MEMORY ++ [ .selection/scroll LDZ2 8** ++ ] ;select JSR2
 
 BRK
 
@@ -365,8 +363,8 @@ BRK
 @select ( id* -- )
 
 	DUP2 .selection/from LDZ2 == ,&skip JCN
-	DUP2 ;MEMORY << ,&skip JCN
-	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ #0001 -- >> ,&skip JCN
+	DUP2 MEMORY << ,&skip JCN
+	DUP2 MEMORY .data/length LDZ2 ++ #0001 -- >> ,&skip JCN
 	( valid )
 	DUP2 .selection/from STZ2
 	.selection/to STZ2
@@ -380,7 +378,7 @@ RTN
 
 @select-until ( id* -- )
 
-	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ << ,&valid JCN
+	DUP2 MEMORY .data/length LDZ2 ++ << ,&valid JCN
 		POP2 RTN
 		&valid
 
@@ -398,8 +396,8 @@ RTN
 
 @follow-selection ( -- )
 
-	.selection/from LDZ2 ;MEMORY .scroll LDZ2 8** ++ << ,&up JCN
-	.selection/to LDZ2 ;MEMORY #007f ++ .scroll LDZ2 8** ++  >> ,&down JCN
+	.selection/from LDZ2 MEMORY .selection/scroll LDZ2 8** ++ << ,&up JCN
+	.selection/to LDZ2 MEMORY #007f ++ .selection/scroll LDZ2 8** ++  >> ,&down JCN
 	RTN
 
 	&up
@@ -420,7 +418,7 @@ RTN
 
 @scroll-to ( addr* -- )
 
-	;MEMORY -- 8// .scroll STZ2
+	MEMORY -- 8// .selection/scroll STZ2
 
 RTN
 
@@ -443,7 +441,7 @@ RTN
 
 	#0010 #0000 
 	&loop
-		( addr ) DUP2 8** ;MEMORY ++ .scroll LDZ2 8** ++ STH2
+		( addr ) DUP2 8** MEMORY ++ .selection/scroll LDZ2 8** ++ STH2
 		( y ) DUP2 10** .byte-frame/y LDZ2 ++
 		STH2r ;draw-row JSR2
 		INC2 GTH2k ,&loop JCN
@@ -497,7 +495,7 @@ RTN
 
 @get-byte-color ( id* )
 
-	DUP2 ;MEMORY ;MEMORY-LEN LDA2 ++ << ,&exists JCN
+	DUP2 MEMORY .data/length LDZ2 ++ << ,&exists JCN
 		POP2 #03 RTN
 		&exists
 
@@ -558,26 +556,13 @@ RTN
 
 @draw-menu ( -- )
 
-	( start byte )
-	.selection/from LDZ2 ;MEMORY -- STH STH
-	.menu-frame/x LDZ2 .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
-	.menu-frame/x LDZ2 #0010 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
-
-	( / )
-	.menu-frame/x LDZ2 #0020 ++ .menu-frame/y LDZ2 LIT '/ #03 ;draw-char JSR2
-
-	( end byte )
-	;MEMORY-LEN LDA2 #0001 -- STH STH
-	.menu-frame/x LDZ2 #0028 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
-	.menu-frame/x LDZ2 #0038 ++ .menu-frame/y LDZ2 STHr #01 ;draw-byte JSR2
-
 	( filepath )
 	#01 ;draw-filepath JSR2
 
 RTN
 
 @draw-state ( -- )
-	
+
 
 RTN
 
@@ -588,6 +573,17 @@ RTN
 	.file-frame/y LDZ2 
 	;path/name STHr 
 		;draw-text JSR2
+
+	( start byte )
+	.selection/from LDZ2 MEMORY -- STH STH
+	.file-frame/x2 LDZ2 #0048 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+	.file-frame/x2 LDZ2 #0038 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+	( / )
+	.file-frame/x2 LDZ2 #0028 -- .file-frame/y LDZ2 LIT '/ #03 ;draw-char JSR2
+	( end byte )
+	.data/length LDZ2 #0001 -- STH STH
+	.file-frame/x2 LDZ2 #0020 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+	.file-frame/x2 LDZ2 #0010 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
 
 RTN
 
@@ -618,7 +614,7 @@ RTN
 
 @clear ( -- )
 
-	;MEMORY DUP2 #8000 ++ SWP2
+	MEMORY DUP2 MEMORY-SIZE ++ SWP2
 	&loop
 		DUP2 #00 ROT ROT STA
 		INC2 GTH2k ,&loop JCN
@@ -632,7 +628,7 @@ RTN
 
 	( clear )
 	;clear JSR2
-	;MEMORY ;select JSR2
+	MEMORY ;select JSR2
 
 	STH2
 	#0c #00
@@ -644,8 +640,8 @@ RTN
 	.path/length STZ 
 	POP2r
 	RESET-STATE
-	#0000 .scroll STZ2
-	#0008 ;MEMORY-LEN STA2
+	#0000 .selection/scroll STZ2
+	#0008 .data/length STZ2
 	;redraw JSR2
 
 RTN
@@ -654,9 +650,9 @@ RTN
 
 	( load bytes )
 	;path/name .File/name DEO2
-	#8000         .File/length DEO2
-	;MEMORY       .File/load DEO2
-	.File/success DEI2 ;MEMORY-LEN STA2
+	MEMORY-SIZE         .File/length DEO2
+	MEMORY       .File/load DEO2
+	.File/success DEI2 .data/length STZ2
 	RESET-STATE
 	;redraw JSR2
 
@@ -665,8 +661,8 @@ RTN
 @save-file ( -- )
 
 	;path/name .File/name DEO2 
-	;MEMORY-LEN LDA2 .File/length DEO2 
-	;MEMORY .File/save DEO2 
+	.data/length LDZ2 .File/length DEO2 
+	MEMORY .File/save DEO2 
 	RESET-STATE
 
 RTN
@@ -686,7 +682,7 @@ RTN
 @paste-snarf ( -- )
 
 	;snarf-txt .File/name DEO2
-	#8000 .File/length DEO2
+	MEMORY-SIZE .File/length DEO2
 	.selection/from LDZ2 .File/load DEO2
 	;redraw JSR2
 
@@ -778,12 +774,6 @@ RTN
 @untitled-txt  "untitled.chr $1
 @cursor-icn    80c0 e0f0 f8e0 1000
 
-@scrollbar_icn
-	aa55 aa55 aa55 aa55 ( bg )
-	ffff ffff ffff ffff ( fg )
-	0010 387c fe10 1010 ( up )
-	0010 1010 fe7c 3810 ( down )
-
 @font-hex
 	007c 8282 8282 827c 0030 1010 1010 1010
 	007c 8202 7c80 80fe 007c 8202 1c02 827c
@@ -795,7 +785,3 @@ RTN
 	007c 8280 f080 827c 007c 8280 f080 8080 
 
 include src/font.tal
-
-@MEMORY-LEN $2
-
-@MEMORY
