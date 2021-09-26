@@ -1,15 +1,18 @@
-(
+( 
 	app/dexe : hex editor
 	
-	arrows     - move selection
-	enter      - insert byte
-	backspace  - delete byte
-	left-click - select bytes
+	- ctrl+r - edit filenname
+	- ctrl+R - erase filenname
+	- ctrl+o - open file
+	- ctrl+s - save file
 
-	TODO:
-		copy/paste
-		scrollbar
-)
+	- ctrl+c - copy selection
+	- ctrl+C - copy selection(text mode)
+	- ctrl+v - paste selection
+
+	- arrows    - move selection
+	- enter     - insert byte
+	- backspace - delete byte )
 
 %+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
 %<  { LTH } %>   { GTH }  %=  { EQU } %!   { NEQ }
@@ -21,7 +24,7 @@
 
 %RTN  { JMP2r }
 %SWP2? { #01 JCN SWP }
-%BRK? { #01 JCN BRK }
+%BRK?  { #01 JCN BRK }
 
 %2*   { #10 SFT }
 %4*   { #20 SFT } %4/   { #02 SFT }
@@ -61,18 +64,13 @@
 @data
 	&length $2
 @cursor 
-	&x $2 &y $2 
-@state
-	&timer $1
-	&blink $1
-	&changed $1
+	&x $2 &y $2 &last $1
+@state 
+	&timer $1 &blink $1 &changed $1
 @path 
-	&length $1
-	&name $20
+	&length $1 &name $20
 @selection
-	&from $2
-	&to $2
-	&scroll $2
+	&from $2 &to $2 &scroll $2
 @frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
 @file-frame
@@ -89,7 +87,7 @@
 ( program )
 
 |0100
-	
+
 	( theme )
 	#0f77 .System/r DEO2 
 	#0fc7 .System/g DEO2 
@@ -114,23 +112,23 @@
 		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
 
 	.frame/x LDZ2 
-		DUP2 .byte-frame/x STZ2 #00c0 ++ .byte-frame/x2 STZ2
+		DUP2 .byte-frame/x STZ2 #00b8 ++ .byte-frame/x2 STZ2
 	.frame/y LDZ2 #0020 ++
 		DUP2 .byte-frame/y STZ2 #0100 ++ .byte-frame/y2 STZ2
 
-	.byte-frame/x2 LDZ2 #0018 ++
+	.byte-frame/x2 LDZ2 #0008 ++
+		DUP2 .tile-frame/x STZ2 #0010 ++ .tile-frame/x2 STZ2
+	.byte-frame/y LDZ2 
+		DUP2 .tile-frame/y STZ2 #0100 ++ .tile-frame/y2 STZ2
+
+	.tile-frame/x2 LDZ2 #0008 ++
 		DUP2 .char-frame/x STZ2 #0040 ++ .char-frame/x2 STZ2
 	.byte-frame/y LDZ2 
 		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
 
-	.char-frame/x2 LDZ2 #0008 ++
-		DUP2 .tile-frame/x STZ2 #0008 ++ .tile-frame/x2 STZ2
-	.byte-frame/y LDZ2 
-		DUP2 .tile-frame/y STZ2 #0100 ++ .tile-frame/y2 STZ2
-
 	.frame/x LDZ2
-		DUP2 .menu-frame/x STZ2 #0100 ++ .menu-frame/x2 STZ2
-	.frame/y LDZ2 #0130 ++
+		DUP2 .menu-frame/x STZ2 #0118 ++ .menu-frame/x2 STZ2
+	.byte-frame/y2 LDZ2 #0010 ++
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
 	;untitled-txt ;new-file JSR2
@@ -139,7 +137,7 @@
 BRK
 
 @untrap ( -- )
-	
+
 	( vectors ) 
 	;on-frame .Screen/vector DEO2
 	;on-button .Controller/vector DEO2
@@ -167,7 +165,7 @@ RTN
 RTN
 
 @on-frame ( -> )
-	
+	( unused )
 BRK
 
 @on-frame-trap ( -> )
@@ -184,6 +182,7 @@ BRK
 
 @on-button ( -> )
 
+	( arrows )
 	.Controller/button DEI
 	DUP #44 ! ,&no-left-sel JCN
 		.selection/to LDZ2 #0001 -- ;select-until JSR2 POP BRK
@@ -207,6 +206,7 @@ BRK
 	( ctrl )
 	#01 AND ;on-control JCN2
 
+	( keys )
 	.Controller/key DEI
 	DUP #1b ! ,&no-esc JCN
 		;reset-selection JSR2 POP BRK
@@ -313,10 +313,7 @@ BRK
 		&no-down
 	POP
 
-	.Mouse/state DEI BRK?
-
 	.Mouse/x DEI2 .Mouse/y DEI2 
-	( begin with canvas )
 	OVR2 OVR2 .byte-frame ;within-rect JSR2
 		;on-touch-byte JCN2
 	OVR2 OVR2 .char-frame ;within-rect JSR2
@@ -337,42 +334,95 @@ BRK
 	.Mouse/state DEI BRK?
 
 	;untrap JSR2
-	
+
 BRK
 
 @on-touch-byte ( x* y* -> )
 
+	( stash addr* )
 	.byte-frame/y LDZ2 -- 10// NIP 8* STH
 	.byte-frame/x LDZ2 -- 8// NIP #03 DIV STHr +
+	TOS MEMORY ++ [ .selection/scroll LDZ2 8** ++ ]
+	STH2
 
-	TOS MEMORY ++ [ .selection/scroll LDZ2 8** ++ ] ;select JSR2
+	.Mouse/state DEI .cursor/last LDZ
+	DUP2 #0100 !! ,&no-down JCN
+		( select from )
+		 STH2kr ;select JSR2
+		&no-down
+	DUP2 #0001 !! ,&no-up JCN
+		( select to )
+		STH2kr ;select-until JSR2
+		&no-up
+	DUP2 #0101 !! ,&no-drag JCN
+		( select to )
+		STH2kr ;select-until JSR2
+		&no-drag
+	POP2
+	( pop addr* ) POP2r
+	.Mouse/state DEI .cursor/last STZ
 
 BRK
 
 @on-touch-char ( x* y* -> )
 
+	( stash addr* )
 	.char-frame/y LDZ2 -- 10// NIP 8* STH
 	.char-frame/x LDZ2 -- 8// NIP STHr +
+	TOS MEMORY ++ [ .selection/scroll LDZ2 8** ++ ] 
+	STH2 
 
-	TOS MEMORY ++ [ .selection/scroll LDZ2 8** ++ ] ;select JSR2
+	.Mouse/state DEI .cursor/last LDZ
+	DUP2 #0100 !! ,&no-down JCN
+		( select from )
+		 STH2kr ;select JSR2
+		&no-down
+	DUP2 #0001 !! ,&no-up JCN
+		( select to )
+		STH2kr ;select-until JSR2
+		&no-up
+	DUP2 #0101 !! ,&no-drag JCN
+		( select to )
+		STH2kr ;select-until JSR2
+		&no-drag
+	POP2
+	( pop addr* ) POP2r
+	.Mouse/state DEI .cursor/last STZ
 
 BRK
 
 @on-touch-tile ( x* y* -> )
 
-	POP2 POP2
+	.Mouse/state DEI #00 ! ,&continue JCN
+		POP2 POP2 BRK
+		&continue
+
+	( row ) NIP2 .tile-frame/y LDZ2 -- 10// 8**
+	MEMORY ++ [ .selection/scroll LDZ2 8** ++ ] 
+	DUP2 .selection/from STZ2
+		#0007 ++ ;select-until JSR2
 
 BRK
 
 @on-touch-file ( x* y* -> )
 
+	.Mouse/state DEI #00 ! ,&continue JCN
+		POP2 POP2 BRK
+		&continue
+
 	POP2 POP2
+
+	.Mouse/state DEI BRK?
 	#00 ;draw-filepath JSR2 
 	;trap JSR2
 
 BRK
 
 @on-touch-menu ( x* y* -> )
+
+	.Mouse/state DEI #00 ! ,&continue JCN
+		POP2 POP2 BRK
+		&continue
 
 	.menu-frame/y LDZ2 -- 8// NIP STH
 	.menu-frame/x LDZ2 -- 8// NIP STHr
@@ -527,15 +577,7 @@ RTN
 	POP2 POP2
 
 	.file-frame/x LDZ2 .file-frame/x2 LDZ2 .file-frame/y2 LDZ2 #03 ;line-hor JSR2
-
 	;draw-menu JSR2
-	( 
-	.file-frame #01 ;line-rect JSR2
-	.byte-frame #01 ;line-rect JSR2
-	.char-frame #02 ;line-rect JSR2
-	.tile-frame #03 ;line-rect JSR2
-	.menu-frame #03 ;line-rect JSR2
-	 )
 
 RTN
 
@@ -647,7 +689,6 @@ RTN
 		INC GTHk ,&ver JCN
 	POP2
 
-
 RTN
 	&x $2 &y $2 &addr $2
 
@@ -684,7 +725,6 @@ RTN
 RTN
 
 @draw-state ( -- )
-
 
 RTN
 
@@ -850,38 +890,6 @@ RTN
 		( draw ) STHkr .Screen/pixel DEO
 		#0002 ++ GTH2k ,&loop JCN
 	POP2 POP2 POPr
-
-RTN
-
-@line-rect ( rect color -- )
-
-	STH STH
-	( y2 ) STHkr #06 + LDZ2
-	( y1 ) STHkr #02 + LDZ2 #0001 -- ( flip sign ) GTH2k SWP2?
-	&ver
-		( save ) DUP2 .Screen/y DEO2
-		( x1 ) STHkr LDZ2 #0001 -- .Screen/x DEO2 
-		OVRr STHr .Screen/pixel DEO
-		( x2 ) STHkr #04 + LDZ2 .Screen/x DEO2 
-		OVRr STHr .Screen/pixel DEO
-		( incr )
-		INC2 GTH2k ,&ver JCN
-	POP2
-	( x2 ) STHkr #04 + LDZ2
-	( x1 ) STHkr LDZ2 #0001 -- ( flip sign ) GTH2k SWP2?
-	&hor
-		( save ) DUP2 .Screen/x DEO2
-		( y1 ) STHkr #02 + LDZ2 #0001 -- .Screen/y DEO2 
-		OVRr STHr .Screen/pixel DEO
-		( y2 ) STHkr #06 + LDZ2 .Screen/y DEO2 
-		OVRr STHr .Screen/pixel DEO
-		( incr )
-		INC2 GTH2k ,&hor JCN
-	POP2
-	POPr 
-	.Screen/x DEO2
-	.Screen/y DEO2 
-	STHr .Screen/pixel DEO
 
 RTN
 
