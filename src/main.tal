@@ -162,6 +162,11 @@ RTN
 	#01 ;draw-filepath JSR2
 	RELEASE-MOUSE
 
+	( clear cursor )
+	.cursor/x LDZ2 .Screen/x DEO2 
+	.cursor/y LDZ2 .Screen/y DEO2 
+	#40 .Screen/sprite DEO
+
 RTN
 
 @on-frame ( -> )
@@ -800,6 +805,7 @@ RTN
 	( clear )
 	;clear JSR2
 	MEMORY ;select JSR2
+	#00 ;draw-filepath JSR2
 
 	STH2
 	#0c #00
@@ -874,7 +880,9 @@ RTN
 @paste-snarf ( -- )
 
 	;snarf-txt .File/name DEO2
-	MEMORY-SIZE .File/length DEO2
+	( space left until eof )
+	.data/length LDZ2 .selection/from LDZ2 MEMORY -- --
+		.File/length DEO2
 	.selection/from LDZ2 .File/load DEO2
 	;redraw JSR2
 
