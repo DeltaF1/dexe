@@ -76,7 +76,7 @@
 @file-frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
 @byte-frame
-	&x $2 &y $2 &x2 $2 &y2 $2 
+	&x $2 &y $2 &x2 $2 &y2 $2 &rows $2
 @char-frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
 @tile-frame
@@ -108,13 +108,16 @@
 
 	.frame/x LDZ2 
 		DUP2 .file-frame/x STZ2 #0118 ++ .file-frame/x2 STZ2
-	.frame/y LDZ2 
+	#0020
 		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
 
 	.frame/x LDZ2 
 		DUP2 .byte-frame/x STZ2 #00b8 ++ .byte-frame/x2 STZ2
-	.frame/y LDZ2 #0020 ++
-		DUP2 .byte-frame/y STZ2 #0100 ++ .byte-frame/y2 STZ2
+	.file-frame/y2 LDZ2 #0008 ++
+		.byte-frame/y STZ2 
+	.Screen/height DEI2 #0040 -- .byte-frame/y2 STZ2
+
+	.byte-frame/y2 LDZ2 .byte-frame/y LDZ2 -- 10// .byte-frame/rows STZ2
 
 	.byte-frame/x2 LDZ2 #0008 ++
 		DUP2 .tile-frame/x STZ2 #0010 ++ .tile-frame/x2 STZ2
@@ -487,7 +490,7 @@ RTN
 @follow-selection ( -- )
 
 	.selection/from LDZ2 MEMORY .selection/scroll LDZ2 8** ++ << ,&up JCN
-	.selection/to LDZ2 MEMORY #007f ++ .selection/scroll LDZ2 8** ++  >> ,&down JCN
+	.selection/to LDZ2 MEMORY [ .byte-frame/rows LDZ2 8** #0001 -- ] ++ .selection/scroll LDZ2 8** ++  >> ,&down JCN
 	RTN
 
 	&up
@@ -495,7 +498,7 @@ RTN
 		RTN
 
 	&down
-		.selection/to LDZ2 #0080 -- #0008 ++ ;scroll-to JSR2
+		.selection/to LDZ2 [ .byte-frame/rows LDZ2 8** ] -- #0008 ++ ;scroll-to JSR2
 
 RTN
 
@@ -573,7 +576,7 @@ RTN
 
 @redraw ( -- )
 
-	#0010 #0000 
+	.byte-frame/rows LDZ2 #0000 
 	&loop
 		( addr ) DUP2 8** MEMORY ++ .selection/scroll LDZ2 8** ++ STH2
 		( y ) DUP2 10** .byte-frame/y LDZ2 ++
