@@ -48,6 +48,13 @@
 %MEMORY { #8000 }
 %MEMORY-SIZE { #7000 }
 
+%MAX2 { GTH2k #01 JCN SWP2 POP2 }
+%MIN2 { LTH2k #01 JCN SWP2 POP2 }
+
+( a b -- a-b )
+( If a-b > a then return 0 )
+%SUB2CLAMP { SUB2k NIP2 GTH2k #04 JCN POP2 #0000 NIP2 }
+
 ( devices )
 
 |00 @System     &vector $2 &pad     $6 &r      $2 &g     $2 &b     $2
@@ -74,16 +81,17 @@
 @frame
 	&x $2 &y $2 &x2 $2 &y2 $2 
 @file-frame
-	&x $2 &y $2 &x2 $2 &y2 $2 
+	&x $2 &y $2 &x2 $2 &y2 $2 %file-frame-width { #0118 }
 @byte-frame
-	&x $2 &y $2 &x2 $2 &y2 $2 &rows $2
+	&x $2 &y $2 &x2 $2 &y2 $2 &rows $2 %byte-frame-width { #00b8 }
 @char-frame
-	&x $2 &y $2 &x2 $2 &y2 $2 
+	&x $2 &y $2 &x2 $2 &y2 $2 %char-frame-width { #0040 }
 @tile-frame
-	&x $2 &y $2 &x2 $2 &y2 $2 
+	&x $2 &y $2 &x2 $2 &y2 $2 %tile-frame-width { #0010 }
 @menu-frame
-	&x $2 &y $2 &x2 $2 &y2 $2 
-
+	&x $2 &y $2 &x2 $2 &y2 $2
+@padding
+	&horizontal $2 %PADDING { .padding LDZ2 }
 ( program )
 
 |0100
@@ -101,32 +109,41 @@
 	#0180 .Screen/height DEO2
 
 	( frame )
-	.Screen/width DEI2 2// #0088 -- DUP2 .frame/x STZ2
+	.Screen/width DEI2 2// #0088 SUB2CLAMP DUP2 .frame/x STZ2
 		#0100 ++ .frame/x2 STZ2
-	.Screen/height DEI2 2// #00a0 -- DUP2 .frame/y STZ2
+	.Screen/height DEI2 2// #00a0 SUB2CLAMP DUP2 .frame/y STZ2
 		#0100 ++ .frame/y2 STZ2
 
-	.frame/x LDZ2 
-		DUP2 .file-frame/x STZ2 #0118 ++ .file-frame/x2 STZ2
+
+	( Calculate padding )
+	.Screen/width DEI2 byte-frame-width tile-frame-width char-frame-width
+		ADD2 ADD2
+
+		SUB2CLAMP 2// ( 2 pads needed )
+		#0008 MIN2 ( Pad should only be 8 pixels max )
+		.padding/horizontal STZ2
+
+	.frame/x LDZ2
+		DUP2 .file-frame/x STZ2 file-frame-width ++ .file-frame/x2 STZ2
 	#0020
 		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
 
-	.frame/x LDZ2 
-		DUP2 .byte-frame/x STZ2 #00b8 ++ .byte-frame/x2 STZ2
+	.frame/x LDZ2
+		DUP2 .byte-frame/x STZ2 byte-frame-width ++ .byte-frame/x2 STZ2
 	.file-frame/y2 LDZ2 #0008 ++
 		.byte-frame/y STZ2 
 	.Screen/height DEI2 #0040 -- .byte-frame/y2 STZ2
 
 	.byte-frame/y2 LDZ2 .byte-frame/y LDZ2 -- 10// .byte-frame/rows STZ2
 
-	.byte-frame/x2 LDZ2 #0008 ++
-		DUP2 .tile-frame/x STZ2 #0010 ++ .tile-frame/x2 STZ2
-	.byte-frame/y LDZ2 
+	.byte-frame/x2 LDZ2 PADDING ++
+		DUP2 .tile-frame/x STZ2 tile-frame-width ++ .tile-frame/x2 STZ2
+	.byte-frame/y LDZ2
 		DUP2 .tile-frame/y STZ2 #0100 ++ .tile-frame/y2 STZ2
 
-	.tile-frame/x2 LDZ2 #0008 ++
-		DUP2 .char-frame/x STZ2 #0040 ++ .char-frame/x2 STZ2
-	.byte-frame/y LDZ2 
+	.tile-frame/x2 LDZ2 PADDING ++
+		DUP2 .char-frame/x STZ2 char-frame-width ++ .char-frame/x2 STZ2
+	.byte-frame/y LDZ2
 		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
 
 	.frame/x LDZ2
@@ -599,7 +616,7 @@ RTN
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
-		( x-block ) DUP #03 MUL TOS 8** .frame/x LDZ2 ++
+		( x-block ) DUP #03 MUL TOS 8** .byte-frame/x LDZ2 ++
 		STH2r STHr STHr ;draw-byte JSR2
 		INC GTHk ,&bytes-loop JCN
 	POP2
@@ -609,13 +626,13 @@ RTN
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
-		( x-block ) DUP TOS 8** .frame/x LDZ2 ++ #00d8 ++
+		( x-block ) DUP TOS 8** .char-frame/x LDZ2 ++ #0008 ++
 		STH2r STHr STHr ;draw-char JSR2
 		INC GTHk ,&chars-loop JCN
 	POP2
 
-	.frame/x LDZ2 #00c0 ++ 
-	.Screen/y DEI2 #0010 -- 
+	.tile-frame/x LDZ2
+	.Screen/y DEI2 #0010 --
 	;&row LDA2 #01
 		;draw-tile JSR2
 
