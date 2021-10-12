@@ -83,7 +83,7 @@
 @file-frame
 	&x $2 &y $2 &x2 $2 &y2 $2 %file-frame-width { #0118 }
 @byte-frame
-	&x $2 &y $2 &x2 $2 &y2 $2 &rows $2 %byte-frame-width { #00b8 }
+	&x $2 &y $2 &x2 $2 &y2 $2 &rows $2 &pad-style $1 &width $2 %byte-frame-width { .byte-frame/width LDZ2 }
 @char-frame
 	&x $2 &y $2 &x2 $2 &y2 $2 %char-frame-width { #0040 }
 @tile-frame
@@ -109,22 +109,34 @@
 	#0180 .Screen/height DEO2
 
 	( frame )
-	.Screen/width DEI2 2// #0088 SUB2CLAMP DUP2 .frame/x STZ2
-		#0100 ++ .frame/x2 STZ2
-	.Screen/height DEI2 2// #00a0 SUB2CLAMP DUP2 .frame/y STZ2
-		#0100 ++ .frame/y2 STZ2
+	.Screen/width DEI2 DUP2 2// #0088 SUB2CLAMP DUP2 .frame/x STZ2
+		#0100 ++ ( screen-width* desired-width* ) MIN2  .frame/x2 STZ2
+	.Screen/height DEI2 DUP2 2// #00a0 SUB2CLAMP DUP2 .frame/y STZ2
+		#0100 ++ MIN2 .frame/y2 STZ2
 
+	#00b8 .byte-frame/width STZ2
 
 	( Calculate padding )
 	.Screen/width DEI2 byte-frame-width tile-frame-width char-frame-width
 		ADD2 ADD2
+
+		( screen-width* required-width* )
+		( If the screen is too small then group the bytes in the byte frame into pairs )
+		OVR2 #0108 LTH2 DUP
+		.byte-frame/pad-style STZ ( 0 = default 1 = group pairs of bytes )
+		#01 EOR ,&skip JCN
+			.byte-frame/width LDZ2k #0020 -- ROT STZ2
+			#0020 -- ( Subtract from calculation for padding as well )
+		&skip
 
 		SUB2CLAMP 2// ( 2 pads needed )
 		#0008 MIN2 ( Pad should only be 8 pixels max )
 		.padding/horizontal STZ2
 
 	.frame/x LDZ2
-		DUP2 .file-frame/x STZ2 file-frame-width ++ .file-frame/x2 STZ2
+		.file-frame/x STZ2
+	.frame/x2 LDZ2
+		.file-frame/x2 STZ2
 	#0020
 		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
 
@@ -616,7 +628,11 @@ RTN
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
-		( x-block ) DUP #03 MUL TOS 8** .byte-frame/x LDZ2 ++
+		( x-block ) DUP DUP #03 MUL SWP ( By default each byte uses 3 tiles )
+			DUP #01 AND ( Toggle every other byte ) ( byte*3 byte byte&1 )
+			SWP #06 AND #01 SFT ADD
+			.byte-frame/pad-style LDZ MUL SUB
+			TOS	8** .byte-frame/x LDZ2 ++ ( offset from edge of frame )
 		STH2r STHr STHr ;draw-byte JSR2
 		INC GTHk ,&bytes-loop JCN
 	POP2
@@ -626,7 +642,7 @@ RTN
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
-		( x-block ) DUP TOS 8** .char-frame/x LDZ2 ++ #0008 ++
+		( x-block ) DUP TOS 8** .char-frame/x LDZ2 ++
 		STH2r STHr STHr ;draw-char JSR2
 		INC GTHk ,&chars-loop JCN
 	POP2
