@@ -91,7 +91,7 @@
 @menu-frame
 	&x $2 &y $2 &x2 $2 &y2 $2
 @padding
-	&horizontal $2 %PADDING { .padding LDZ2 }
+	&horizontal $2 &vertical $2
 ( program )
 
 |0100
@@ -110,13 +110,17 @@
 
 	( frame )
 	.Screen/width DEI2 DUP2 2// #0088 SUB2CLAMP DUP2 .frame/x STZ2
-		#0100 ++ ( screen-width* desired-width* ) MIN2  .frame/x2 STZ2
+		#0118 ++ ( screen-width* desired-width* ) MIN2 .frame/x2 STZ2
 	.Screen/height DEI2 DUP2 2// #00a0 SUB2CLAMP DUP2 .frame/y STZ2
 		#0100 ++ MIN2 .frame/y2 STZ2
 
 	#00b8 .byte-frame/width STZ2
 
-	( Calculate padding )
+	( Calculate vertical padding )
+	.Screen/height DEI2 #0060 SUB2CLAMP 4//
+	#0020 MIN2 .padding/vertical STZ2
+
+	( Calculate horizontal padding )
 	.Screen/width DEI2 byte-frame-width tile-frame-width char-frame-width
 		ADD2 ADD2
 
@@ -137,30 +141,30 @@
 		.file-frame/x STZ2
 	.frame/x2 LDZ2
 		.file-frame/x2 STZ2
-	#0020
+	.padding/vertical LDZ2
 		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
 
 	.frame/x LDZ2
 		DUP2 .byte-frame/x STZ2 byte-frame-width ++ .byte-frame/x2 STZ2
 	.file-frame/y2 LDZ2 #0008 ++
 		.byte-frame/y STZ2 
-	.Screen/height DEI2 #0040 -- .byte-frame/y2 STZ2
+	.Screen/height DEI2 .padding/vertical LDZ2 2** -- .byte-frame/y2 STZ2
 
 	.byte-frame/y2 LDZ2 .byte-frame/y LDZ2 -- 10// .byte-frame/rows STZ2
 
-	.byte-frame/x2 LDZ2 PADDING ++
+	.byte-frame/x2 LDZ2 .padding/horizontal LDZ2 ++
 		DUP2 .tile-frame/x STZ2 tile-frame-width ++ .tile-frame/x2 STZ2
 	.byte-frame/y LDZ2
 		DUP2 .tile-frame/y STZ2 #0100 ++ .tile-frame/y2 STZ2
 
-	.tile-frame/x2 LDZ2 PADDING ++
+	.tile-frame/x2 LDZ2 .padding/horizontal LDZ2 ++
 		DUP2 .char-frame/x STZ2 char-frame-width ++ .char-frame/x2 STZ2
 	.byte-frame/y LDZ2
 		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
 
 	.frame/x LDZ2
-		DUP2 .menu-frame/x STZ2 #0118 ++ .menu-frame/x2 STZ2
-	.byte-frame/y2 LDZ2 #0010 ++
+		DUP2 .menu-frame/x STZ2 #0040 ++ .menu-frame/x2 STZ2
+	.byte-frame/y2 LDZ2 .padding/vertical LDZ2 2// ++
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
 	;untitled-txt ;new-file JSR2
