@@ -118,7 +118,8 @@
 
 	( Calculate vertical padding )
 	.Screen/height DEI2 #0060 SUB2CLAMP 4//
-	#0020 MIN2 .padding/vertical STZ2
+		#0020 MIN2 ( Clamp padding to the default of 0020 )
+		.padding/vertical STZ2
 
 	( Calculate horizontal padding )
 	.Screen/width DEI2 byte-frame-width tile-frame-width char-frame-width
@@ -129,12 +130,13 @@
 		OVR2 #0108 LTH2 DUP
 		.byte-frame/pad-style STZ ( 0 = default 1 = group pairs of bytes )
 		#01 EOR ,&skip JCN
+			( Reduce the byte frames width to account for this change )
 			.byte-frame/width LDZ2k #0020 -- ROT STZ2
 			#0020 -- ( Subtract from calculation for padding as well )
 		&skip
 
 		SUB2CLAMP 2// ( 2 pads needed )
-		#0008 MIN2 ( Pad should only be 8 pixels max )
+		#0008 MIN2 ( Clamp padding to the default of 0008 )
 		.padding/horizontal STZ2
 
 	.frame/x LDZ2
@@ -163,7 +165,7 @@
 		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
 
 	.frame/x LDZ2
-		DUP2 .menu-frame/x STZ2 #0040 ++ .menu-frame/x2 STZ2
+		DUP2 .menu-frame/x STZ2 #0020 ++ .menu-frame/x2 STZ2
 	.byte-frame/y2 LDZ2 .padding/vertical LDZ2 2// ++
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
@@ -633,7 +635,7 @@ RTN
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
 		( x-block ) DUP DUP #03 MUL SWP ( By default each byte uses 3 tiles )
-			DUP #01 AND ( Toggle every other byte ) ( byte*3 byte byte&1 )
+			DUP #01 AND ( If the byte is odd and the pad-style is 1 then group into pairs )
 			SWP #06 AND #01 SFT ADD
 			.byte-frame/pad-style LDZ MUL SUB
 			TOS	8** .byte-frame/x LDZ2 ++ ( offset from edge of frame )
