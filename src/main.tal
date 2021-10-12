@@ -93,6 +93,8 @@
 	#0fc7 .System/g DEO2 
 	#0f97 .System/b DEO2
 
+	;on-console .Console/vector DEO2
+
 	( vectors ) 
 	;untrap JSR2
 
@@ -138,6 +140,27 @@
 	MEMORY ;select JSR2
 
 BRK
+
+@on-console ( -- )
+
+	#00 ;draw-filepath JSR2
+	.Console/read DEI DUP 
+	#0a = ,&counter LDR #20 = #0000 == ,&no-end JCN
+		( set length ) ,&counter LDR .path/length STZ
+		( null char ) #00 .path ,&counter LDR INC + STZ
+		( reset counter ) #00 ,&counter STR 
+		( load ) ;load-file JSR2
+		POP BRK
+		&no-end
+	,&counter LDR 
+		( length ) DUP .path/length STZ
+		INC 
+			( inc counter ) DUP ,&counter STR 
+			( write ) .path + STZ
+	#01 ;draw-filepath JSR2
+
+BRK
+	&counter $1
 
 @untrap ( -- )
 
@@ -255,7 +278,7 @@ BRK
 		;redraw JSR2 POP BRK &no-new
 	DUP [ LIT 'o ] ! ,&no-open JCN
 		;load-file JSR2
-		;redraw JSR2 POP BRK &no-open
+		POP BRK &no-open
 	DUP [ LIT 's ] ! ,&no-save JCN
 		;path/name ;save-file JSR2 
 		POP BRK  &no-save
@@ -834,7 +857,7 @@ RTN
 	MEMORY       .File/load DEO2
 	.File/success DEI2 .data/length STZ2
 	RESET-STATE
-	;redraw JSR2
+	;reset-selection JSR2
 
 RTN
 
