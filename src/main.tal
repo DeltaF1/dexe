@@ -93,9 +93,8 @@
 	#0fc7 .System/g DEO2 
 	#0f97 .System/b DEO2
 
-	;on-console .Console/vector DEO2
-
 	( vectors ) 
+	;on-console .Console/vector DEO2
 	;untrap JSR2
 
 	( set size )
@@ -978,7 +977,6 @@ RTN
 	007c 8202 7e82 827e 00fc 8282 fc82 82fc
 	007c 8280 8080 827c 00fc 8282 8282 82fc
 	007c 8280 f080 827c 007c 8280 f080 8080 
-
 
 include src/font.tal
 
