@@ -98,13 +98,13 @@
 	;untrap JSR2
 
 	( set size )
-	#0100 .Screen/width DEO2
+	#0110 .Screen/width DEO2
 	#0188 .Screen/height DEO2
 
 	( frame )
 	.Screen/width DEI2 2// #007c -- DUP2 .frame/x STZ2
 		#00f8 ++ .frame/x2 STZ2
-	#0008 DUP2 .frame/y STZ2
+	#0008 .frame/y STZ2
 		.Screen/height DEI2 #0008 -- .frame/y2 STZ2
 
 	.frame/x LDZ2 
