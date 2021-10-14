@@ -98,12 +98,12 @@
 	;untrap JSR2
 
 	( set size )
-	#0110 .Screen/width DEO2
-	#0188 .Screen/height DEO2
+	( default ) #0110 .Screen/width DEO2 #0188 .Screen/height DEO2
+	( GBA #00f0 .Screen/width DEO2 #00a0 .Screen/height DEO2 )
 
 	( frame )
-	.Screen/width DEI2 2// #007c -- DUP2 .frame/x STZ2
-		#00f8 ++ .frame/x2 STZ2
+	.Screen/width DEI2 2// #0078 -- DUP2 .frame/x STZ2
+		#00f0 ++ .frame/x2 STZ2
 	#0008 .frame/y STZ2
 		.Screen/height DEI2 #0008 -- .frame/y2 STZ2
 
@@ -120,12 +120,12 @@
 
 	.byte-frame/y2 LDZ2 .byte-frame/y LDZ2 -- 10// .byte-frame/rows STZ2
 
-	.byte-frame/x2 LDZ2 #0008 ++
+	.byte-frame/x2 LDZ2 #0004 ++
 		DUP2 .tile-frame/x STZ2 #0010 ++ .tile-frame/x2 STZ2
 	.byte-frame/y LDZ2 
 		DUP2 .tile-frame/y STZ2 #0100 ++ .tile-frame/y2 STZ2
 
-	.tile-frame/x2 LDZ2 #0008 ++
+	.tile-frame/x2 LDZ2 #0004 ++
 		DUP2 .char-frame/x STZ2 #0040 ++ .char-frame/x2 STZ2
 	.byte-frame/y LDZ2 
 		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
