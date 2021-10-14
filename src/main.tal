@@ -98,25 +98,25 @@
 	;untrap JSR2
 
 	( set size )
-	#0160 .Screen/width DEO2
-	#0180 .Screen/height DEO2
+	#0100 .Screen/width DEO2
+	#0188 .Screen/height DEO2
 
 	( frame )
-	.Screen/width DEI2 2// #0088 -- DUP2 .frame/x STZ2
-		#0100 ++ .frame/x2 STZ2
-	.Screen/height DEI2 2// #00a0 -- DUP2 .frame/y STZ2
-		#0100 ++ .frame/y2 STZ2
+	.Screen/width DEI2 2// #007c -- DUP2 .frame/x STZ2
+		#00f8 ++ .frame/x2 STZ2
+	#0008 DUP2 .frame/y STZ2
+		.Screen/height DEI2 #0008 -- .frame/y2 STZ2
 
 	.frame/x LDZ2 
-		DUP2 .file-frame/x STZ2 #0118 ++ .file-frame/x2 STZ2
-	#0020
+		.file-frame/x STZ2 .frame/x2 LDZ2  .file-frame/x2 STZ2
+	.frame/y LDZ2
 		DUP2 .file-frame/y STZ2 #0018 ++ .file-frame/y2 STZ2
 
 	.frame/x LDZ2 
-		DUP2 .byte-frame/x STZ2 #00b8 ++ .byte-frame/x2 STZ2
+		DUP2 .byte-frame/x STZ2 #0098 ++ .byte-frame/x2 STZ2
 	.file-frame/y2 LDZ2 #0008 ++
 		.byte-frame/y STZ2 
-	.Screen/height DEI2 #0040 -- .byte-frame/y2 STZ2
+	.Screen/height DEI2 #0020 -- .byte-frame/y2 STZ2
 
 	.byte-frame/y2 LDZ2 .byte-frame/y LDZ2 -- 10// .byte-frame/rows STZ2
 
@@ -131,8 +131,8 @@
 		DUP2 .char-frame/y STZ2 #0100 ++ .char-frame/y2 STZ2
 
 	.frame/x LDZ2
-		DUP2 .menu-frame/x STZ2 #0118 ++ .menu-frame/x2 STZ2
-	.byte-frame/y2 LDZ2 #0010 ++
+		.menu-frame/x STZ2 .frame/x2 LDZ2 .menu-frame/x2 STZ2
+	.frame/y2 LDZ2 #0010 --
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
 	;untitled-txt ;new-file JSR2
@@ -621,7 +621,7 @@ RTN
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
-		( x-block ) DUP #03 MUL TOS 8** .frame/x LDZ2 ++
+		( x-block ) DUP TOS 2** ;pos-table ++ LDA2 .frame/x LDZ2 ++
 		STH2r STHr STHr ;draw-byte JSR2
 		INC GTHk ,&bytes-loop JCN
 	POP2
@@ -631,12 +631,12 @@ RTN
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
 		( y ) ;&y LDA2 STH2
-		( x-block ) DUP TOS 8** .frame/x LDZ2 ++ #00d8 ++
+		( x-block ) DUP TOS 8** .char-frame/x LDZ2 ++
 		STH2r STHr STHr ;draw-char JSR2
 		INC GTHk ,&chars-loop JCN
 	POP2
 
-	.frame/x LDZ2 #00c0 ++ 
+	.tile-frame/x LDZ2
 	.Screen/y DEI2 #0010 -- 
 	;&row LDA2 #01
 		;draw-tile JSR2
@@ -965,6 +965,9 @@ RTN
 @bit-icns
 	3844 8282 8244 3800
 	387c fefe fe7c 3800
+@pos-table
+	0000 0010 0028 0038
+	0050 0060 0078 0088
 
 @untitled-txt  "untitled.chr $1
 
