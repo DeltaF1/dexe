@@ -371,7 +371,7 @@ BRK
 
 	( stash addr* )
 	.byte-frame/y LDZ2 -- 10// NIP 8* STH
-	.byte-frame/x LDZ2 -- 8// NIP #03 DIV STHr +
+	.byte-frame/x LDZ2 -- 8// ;touch-table ++ LDA STHr +
 	TOS MEMORY ++ [ .selection/scroll LDZ2 8** ++ ]
 	STH2
 
@@ -968,6 +968,10 @@ RTN
 @pos-table
 	0000 0010 0028 0038
 	0050 0060 0078 0088
+@touch-table
+	0000 0101 0202 0203
+	0303 0404 0505 0606 
+	0607 0707 0000 0000
 
 @untitled-txt  "untitled.chr $1
 
