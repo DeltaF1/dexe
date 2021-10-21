@@ -72,7 +72,7 @@
 @path
 	&length $1 &name $20
 @selection
-	&from $2 &to $2 &scroll $2
+	&from $2 &to $2 &scroll $2 &input $1
 @frame
 	&x $2 &y $2 &x2 $2 &y2 $2
 @file-frame
@@ -143,6 +143,8 @@
 	( theme support )
 	;load-theme JSR2
 
+	( Which frame to type into )
+	#01 .selection/input STZ
 BRK
 
 @on-console ( -- )
@@ -275,6 +277,11 @@ BRK
 	DUP #08 ! ,&no-backspace JCN
 		.selection/from LDZ2 ;memsftl JSR2
 		&no-backspace
+	DUP #09 ! ,&no-tab JCN
+		.selection/input LDZk
+			#01 SFT #00 EQU #01 ADD ( Toggle between 0/1 and 2 )
+		SWP STZ
+		&no-tab
 	POP
 
 BRK
@@ -407,6 +414,8 @@ BRK
 
 	.Mouse/state DEI .cursor/last LDZ
 	DUP2 #0100 !! ,&no-down JCN
+		( Set as active input pane )
+		#01 .selection/input STZ
 		( select from )
 		 STH2kr ;select JSR2
 		&no-down
@@ -434,6 +443,8 @@ BRK
 
 	.Mouse/state DEI .cursor/last LDZ
 	DUP2 #0100 !! ,&no-down JCN
+		( Set as active input pane )
+		#02 .selection/input STZ
 		( select from )
 		 STH2kr ;select JSR2
 		&no-down
@@ -556,7 +567,20 @@ RTN
 
 @fill-selection ( char -- )
 
+	( Determine whether to fill with the literal byte or to interpret as hex digits )
+	.selection/input LDZ
+		#02 EQU ,&fill JCN ( Skip hex conversion and input the raw byte )
+			;key-to-value JSR2
+			DUP #ff EQU ,&no-hex JCN ( If it wasn't a valid hex char then bail )
+			.selection/from LDZ2 LDA ( Read first byte of selection )
+				.selection/input LDZ ;set-nibble JSR2 ( Combine with hex byte )
+				.selection/input TOGGLE ( Change whether we're editing high or low nibble )
+			,&fill JMP
+			&no-hex ( char ) POP RTN
+		&fill ( char )
 	STH
+
+	( Fill selection with byte )
 	.selection/to LDZ2 INC2 .selection/from LDZ2
 	&loop
 		DUP2 STHkr ROT ROT STA
@@ -565,6 +589,29 @@ RTN
 	;redraw JSR2
 
 RTN
+
+( Modified from calc.tal to return ff on invalid input )
+( Decode the ascii chars 0-9a-fA-F to the corresponding nibble )
+@key-to-value ( key -- value )
+
+	DUP #2f > OVR #3a < #0101 !! ,&no-num JCN
+		#30 - RTN
+		&no-num
+	DUP #60 > OVR #67 < #0101 !! ,&no-lc JCN
+		#57 - RTN ( #61 - #0a + )
+		&no-lc
+	DUP #40 > OVR #47 < #0101 !! ,&no-uc JCN
+		#37 - RTN ( #41 - #0a + )
+		&no-uc
+	POP #ff
+
+RTN
+
+@set-nibble ( nibble byte hl -- combined )
+	,&high JCN ( set low nibble )
+		#f0 AND ORA RTN
+	&high ( set high nibble )
+		#0f AND SWP #40 SFT ORA RTN
 
 @reset-selection ( -- )
 
