@@ -683,7 +683,7 @@ RTN
 	.Screen/x DEO2
 	STHr
 
-	DUP #1f > OVR #80 < #0101 == ,&visible JCN
+	DUP #1f > OVR #80 < AND ,&visible JCN
 		POP ;font #000e 10** ++ ,&resume JMP
 	&visible
 		;char-addr JSR2
