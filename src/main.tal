@@ -1,13 +1,13 @@
 ( 
 	app/dexe : hex editor
 	
-	- ctrl+r - edit filenname
-	- ctrl+R - erase filenname
+	- ctrl+r - edit filename
+	- ctrl+R - erase filename
 	- ctrl+o - open file
 	- ctrl+s - save file
 
 	- ctrl+c - copy selection
-	- ctrl+C - copy selection(text mode)
+	- ctrl+C - copy selection as text
 	- ctrl+v - paste selection
 
 	- arrows    - move selection
@@ -23,7 +23,6 @@
 %DEBUG2 { ;print-hex/short JSR2 #0a .Console/write DEO }
 
 %RTN  { JMP2r }
-%SWP2? { #01 JCN SWP }
 %BRK?  { #01 JCN BRK }
 
 %2*   { #10 SFT }
@@ -37,9 +36,10 @@
 %10** { #40 SFT2 } %10// { #04 SFT2 }
 
 %TOS  { #00 SWP } %TOB { SWP POP }
-%INCR { SWP #01 + SWP }
 %TOGGLE { DUP LDZ #00 = SWP STZ }
 %GET-ITER { OVR2 NIP OVR SWP }
+%8MOD { #07 AND }
+%MIN2 { GTH2k JMP SWP2 POP2 }
 
 %RELEASE-MOUSE { #00 .Mouse/state DEO }
 %SET-STATE   { #01 .state/changed STZ ;draw-state JSR2 }
@@ -137,6 +137,7 @@
 
 	;untitled-txt ;new-file JSR2
 	MEMORY ;select JSR2
+
 	( theme support )
 	;load-theme JSR2
 
@@ -202,14 +203,14 @@ BRK
 
 @on-frame-trap ( -> )
 
-	( incr ) .state/timer LDZ INC DUP .state/timer STZ 
+	.state/timer LDZ INC 
+	DUP 8MOD ,&no-blink JCN
+		.state/blink LDZ #00 =
+			DUP 8* INC ;draw-filepath JSR2
+			.state/blink STZ
+		&no-blink
+	.state/timer STZ 
 
-	#08 ! ,&no-toggle JCN
-		.state/blink TOGGLE
-		#01 .state/blink LDZ 8* + ;draw-filepath JSR2
-		#00 .state/timer STZ 
-		&no-toggle
-	
 BRK
 
 @on-button ( -> )
@@ -234,6 +235,18 @@ BRK
 	DUP #80 ! ,&no-right JCN
 		.selection/from LDZ2 #0001 ++ ;select JSR2 POP BRK
 		&no-right
+	DUP #14 ! ,&no-shift-up JCN
+		.selection/to LDZ2 #0008 -- ;select-until JSR2 POP BRK
+		&no-shift-up
+	DUP #24 ! ,&no-shift-down JCN
+		.selection/to LDZ2 #0008 ++ ;select-until JSR2 POP BRK
+		&no-shift-down
+	DUP #11 ! ,&no-ctrl-up JCN
+		.selection/from LDZ2 #0040 -- ;select JSR2 POP BRK
+		&no-ctrl-up
+	DUP #21 ! ,&no-ctrl-down JCN
+		.selection/from LDZ2 #0040 ++ ;select JSR2 POP BRK
+		&no-ctrl-down
 
 	( ctrl )
 	#01 AND ;on-control JCN2
@@ -856,7 +869,7 @@ RTN
 	;path/name .File/name DEO2
 	MEMORY-SIZE         .File/length DEO2
 	MEMORY       .File/load DEO2
-	.File/success DEI2 .data/length STZ2
+	.File/success DEI2 #0001 MIN2 .data/length STZ2
 	RESET-STATE
 	;reset-selection JSR2
 
@@ -942,7 +955,7 @@ RTN
 	&loop
 		( save ) DUP2 .Screen/x DEO2
 		( draw ) STHkr .Screen/pixel DEO
-		#0002 ++ GTH2k ,&loop JCN
+		INC2 INC2 GTH2k ,&loop JCN
 	POP2 POP2 POPr
 
 RTN
