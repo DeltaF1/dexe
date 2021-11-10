@@ -7,15 +7,15 @@
 You must have the [Uxn](https://git.sr.ht/~rabbits/uxn/) assembler and emulator.
 
 ```
-uxnasm noodle.tal noodle.rom && uxnemu noodle.rom
+uxnasm dexe.tal dexe.rom && uxnemu dexe.rom
 ```
 
 ## Controls
 
 ### File
 
-- `ctrl+r` edit filenname
-- `ctrl+R` erase filenname
+- `ctrl+r` edit filename
+- `ctrl+R` erase filename
 - `ctrl+o` open file
 - `ctrl+s` save file
 
