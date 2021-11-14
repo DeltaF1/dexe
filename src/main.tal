@@ -255,10 +255,10 @@ BRK
 	( keys )
 	.Controller/key DEI
 	DUP LIT '+ ! ,&no-inc JCN
-		.selection/from LDZ2 LDAk INC ;fill-selection JSR2
+		.selection/from LDZ2 LDA INC ;fill-selection JSR2
 		&no-inc
 	DUP LIT '- ! ,&no-dec JCN
-		.selection/from LDZ2 LDAk DEC ;fill-selection JSR2
+		.selection/from LDZ2 LDA DEC ;fill-selection JSR2
 		&no-dec
 	DUP #1b ! ,&no-esc JCN
 		;reset-selection JSR2 POP BRK
