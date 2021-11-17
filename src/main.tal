@@ -5,6 +5,7 @@
 	- ctrl+R - erase filename
 	- ctrl+o - open file
 	- ctrl+s - save file
+	- ctrl+a - select all
 
 	- ctrl+c - copy selection
 	- ctrl+C - copy selection as text
@@ -281,6 +282,11 @@ BRK
 @on-control ( -> )
 
 	.Controller/key DEI
+	DUP [ LIT 'a ] ! ,&no-select JCN
+		MEMORY ;select JSR2
+		MEMORY .data/length LDZ2 ++ #0001 -- ;select-until JSR2
+		POP BRK
+		&no-select
 	( file )
 	DUP [ LIT 'r ] ! ,&no-name JCN
 		#00 ;draw-filepath JSR2 
@@ -791,7 +797,7 @@ RTN
 		;draw-text JSR2
 
 	( start byte )
-	.selection/from LDZ2 MEMORY -- STH STH
+	.selection/to LDZ2 MEMORY -- STH STH
 	.file-frame/x2 LDZ2 #0048 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
 	.file-frame/x2 LDZ2 #0038 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
 	( / )
