@@ -921,7 +921,15 @@ RTN
 		( store ) STH2kr STA INC2r
 		( get char ) LDAk #0f AND ;print-hex/parse JSR2 
 		( store ) STH2kr STA INC2r
-		#20 STH2kr STA INC2r
+
+		( linebreak )
+		DUP2 .selection/from LDZ2 -- 
+		DUP2 #000f AND2 #000f !! ,&no-linebreak JCN
+			#0d STH2kr STA INC2r ,&no-space JMP &no-linebreak
+		DUP2 #0001 AND2 #0001 !! ,&no-space JCN
+			#20 STH2kr STA INC2r &no-space
+		POP2
+
 		INC2 GTH2k ,&loop JCN
 	POP2 POP2
 	STH2r ;string-snarf/data -- ;string-snarf/length STA2
