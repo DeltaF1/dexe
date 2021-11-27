@@ -1042,7 +1042,7 @@ RTN
 	007c 8280 8080 827c 00fc 8282 8282 82fc
 	007c 8280 f080 827c 007c 8280 f080 8080 
 
-include src/font.tal
+~src/font.tal
 
 @string-snarf
 	&length $2
