@@ -7,7 +7,7 @@
 You must have the [Uxn](https://git.sr.ht/~rabbits/uxn/) assembler and emulator.
 
 ```
-uxnasm dexe.tal dexe.rom && uxnemu dexe.rom
+uxnasm src/main.tal bin/dexe.rom && uxnemu bin/dexe.rom
 ```
 
 ## Controls
