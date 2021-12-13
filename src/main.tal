@@ -269,7 +269,10 @@ BRK
 		;reset-selection JSR2 POP BRK
 		&no-esc
 	DUP #1f > OVR #7f < #0101 !! ,&no-char JCN
-		DUP ;fill-selection JSR2
+		DUP ;interpret-ascii JSR2 ( ascii ascii -- ascii byte invalid? )
+			( If invalid=1, no byte is provided )
+			,&no-char JCN
+			;fill-selection JSR2
 		&no-char
 	DUP #0d ! ,&no-enter JCN
 		.selection/from LDZ2 ;memsftr JSR2
@@ -565,19 +568,18 @@ RTN
 
 RTN
 
-@fill-selection ( char -- )
-
 	( Determine whether to fill with the literal byte or to interpret as hex digits )
-	.selection/input LDZ
-		#02 EQU ,&fill JCN ( Skip hex conversion and input the raw byte )
+@interpret-ascii ( ascii -- byte invalid? )
+	.selection/input LDZ #02 = ,&return JCN ( If in text mode, skip parsing )
 			;key-to-value JSR2
-			DUP #ff EQU ,&no-hex JCN ( If it wasn't a valid hex char then bail )
+			DUP #ff = ,&invalid JCN ( If it wasn't a valid hex char then bail )
 			.selection/from LDZ2 LDA ( Read first byte of selection )
 				.selection/input LDZ ;set-nibble JSR2 ( Combine with hex byte )
 				.selection/input TOGGLE ( Change whether we're editing high or low nibble )
-			,&fill JMP
-			&no-hex ( char ) POP RTN
-		&fill ( char )
+	&return #00 RTN
+	&invalid POP #01 RTN
+
+@fill-selection ( byte -- )
 	STH
 
 	( Fill selection with byte )
