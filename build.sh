@@ -21,4 +21,4 @@ then
 fi
 
 echo "Running.."
-uxnemu bin/dexe.rom
+uxnemu bin/dexe.rom example.chr

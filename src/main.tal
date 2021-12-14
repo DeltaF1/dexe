@@ -1,4 +1,4 @@
-(
+( 
 	app/dexe : hex editor
 
 	- ctrl+r - edit filename
@@ -15,35 +15,8 @@
 	- enter     - insert byte
 	- backspace - delete byte )
 
-%+  { ADD } %-   { SUB }  %*  { MUL } %/   { DIV }
-%<  { LTH } %>   { GTH }  %=  { EQU } %!   { NEQ }
-%++ { ADD2 } %-- { SUB2 } %** { MUL2 } %// { DIV2 }
-%<< { LTH2 } %>> { GTH2 } %== { EQU2 } %!! { NEQ2 }
+~src/utils.tal
 
-%DEBUG  { ;print-hex/byte JSR2 #0a .Console/write DEO }
-%DEBUG2 { ;print-hex/short JSR2 #0a .Console/write DEO }
-
-%RTN  { JMP2r }
-%BRK?  { #01 JCN BRK }
-%DEC { #01 SUB }
-
-%2*   { #10 SFT }
-%4*   { #20 SFT } %4/   { #02 SFT }
-%8*   { #30 SFT } %8/   { #03 SFT }
-%20*  { #50 SFT }
-%40*  { #60 SFT }
-%2**  { #10 SFT2 } %2// { #01 SFT2 }
-%4**  { #20 SFT2 } %4// { #02 SFT2 }
-%8**  { #30 SFT2 } %8// { #03 SFT2 }
-%10** { #40 SFT2 } %10// { #04 SFT2 }
-
-%TOS  { #00 SWP } %TOB { SWP POP }
-%TOGGLE { DUP LDZ #00 = SWP STZ }
-%GET-ITER { OVR2 NIP OVR SWP }
-%8MOD { #07 AND }
-%MIN2 { GTH2k JMP SWP2 POP2 }
-
-%RELEASE-MOUSE { #00 .Mouse/state DEO }
 %SET-STATE   { #01 .state/changed STZ ;draw-state JSR2 }
 %RESET-STATE { #00 .state/changed STZ ;draw-state JSR2 }
 
@@ -70,7 +43,7 @@
 @state
 	&timer $1 &blink $1 &changed $1
 @path
-	&length $1 &name $20
+	&name $20
 @selection
 	&from $2 &to $2 &scroll $2 &input $1
 @frame
@@ -137,7 +110,7 @@
 	.frame/y2 LDZ2 #0010 --
 		DUP2 .menu-frame/y STZ2 #0010 ++ .menu-frame/y2 STZ2
 
-	;untitled-txt ;new-file JSR2
+	;new-file JSR2
 	MEMORY ;select JSR2
 
 	( theme support )
@@ -147,26 +120,27 @@
 	#01 .selection/input STZ
 BRK
 
-@on-console ( -- )
+@on-console ( -> )
 
-	#00 ;draw-filepath JSR2
-	.Console/read DEI DUP
-	#0a = ,&counter LDR #20 = #0000 == ,&no-end JCN
-		( set length ) ,&counter LDR .path/length STZ
-		( null char ) #00 .path ,&counter LDR INC + STZ
-		( reset counter ) #00 ,&counter STR
-		( load ) ;load-file JSR2
-		POP BRK
-		&no-end
-	,&counter LDR
-		( length ) DUP .path/length STZ
-		INC
-			( inc counter ) DUP ,&counter STR
-			( write ) .path + STZ
+	( starting )
+	;&trap LDA ,&started JCN
+		#00 ;draw-filepath JSR2
+		;path/name #0020 ;mclr JSR2
+		#01 ,&trap STR
+		&started
+	( append )
+	.Console/read DEI #20 < ,&validate JCN
+	;path/name ;slen JSR2 #0020 == ,&validate JCN
+		;path/name .Console/read DEI ;sput JSR2 
+		BRK
+		&validate
+	( validate )
+	;load-file JSR2
 	#01 ;draw-filepath JSR2
+	#00 ,&trap STR
 
 BRK
-	&counter $1
+	&trap $1
 
 @untrap ( -- )
 
@@ -262,7 +236,7 @@ BRK
 		POP BRK
 		&no-inc
 	DUP LIT '- ! ,&no-dec JCN
-		.selection/from LDZ2 LDA DEC ;fill-selection JSR2
+		.selection/from LDZ2 LDA #01 - ;fill-selection JSR2
 		POP BRK
 		&no-dec
 	DUP #1b ! ,&no-esc JCN
@@ -305,15 +279,13 @@ BRK
 		&no-name
 	DUP [ LIT 'R ] ! ,&no-rename JCN
 		#00 ;draw-filepath JSR2
-		#00 .Controller/key DEO
-		#00 .path/length STZ
-		#0000 .path/name STZ2
+		;path/name #0020 ;mclr JSR2
 		;trap JSR2
 		POP BRK
 		&no-rename
 	DUP [ LIT 'n ] ! ,&no-new JCN
 		#25 ;draw-filepath JSR2
-		;untitled-txt ;new-file JSR2
+		;new-file JSR2
 		;redraw JSR2 POP BRK &no-new
 	DUP [ LIT 'o ] ! ,&no-open JCN
 		;load-file JSR2
@@ -341,20 +313,22 @@ BRK
 	DUP ,&continue JCN
 		POP BRK
 		&continue
-	DUP ( backspace ) #08 ! ,&no-edit-backspace JCN
-		( clamp ) .path/length LDZ #00 = ,&edit-end JCN
+	( backspace ) #08 !~ ,&no-edit-backspace JCN
+		( clamp ) ;path/name ;slen JSR2 NIP #00 = ,&edit-end JCN
 		#00 ;draw-filepath JSR2
-		.path/length LDZ #01 - STHk .path/length STZ
-		#00 .path/name STHr + STZ
-		#01 ;draw-filepath JSR2 POP BRK
+		;path/name ;spop JSR2
+		#01 ;draw-filepath JSR2
+		POP BRK
 		&no-edit-backspace
-	DUP ( special ) #20 > ,&no-edit-enter JCN
-		;untrap JSR2 POP BRK
+	( special ) #20 >~ ,&no-edit-enter JCN
+		;on-frame .Screen/vector DEO2
+		;on-button .Controller/vector DEO2
+		#00 .state/blink STZ
+		#01 ;draw-filepath JSR2
+		POP BRK
 		&no-edit-enter
-	( clamp ) .path/length LDZ #1f = ,&edit-end JCN
-	DUP .path/name .path/length LDZ STHk + STZ
-	STHr INC STHk .path/length STZ
-	#00 .path/name STHr + STZ
+	( append ) ;path/name ;slen JSR2 NIP #1f = ,&edit-end JCN
+	DUP ;path/name ROT ;sput JSR2
 	#01 ;draw-filepath JSR2
 	&edit-end
 	POP
@@ -401,7 +375,7 @@ BRK
 @on-mouse-trap ( -> )
 
 	( release trap on touch )
-	.Mouse/state DEI BRK?
+	( skip ) .Mouse/state DEI #01 JCN BRK
 
 	;untrap JSR2
 
@@ -486,7 +460,7 @@ BRK
 
 	POP2 POP2
 
-	.Mouse/state DEI BRK?
+	( skip ) .Mouse/state DEI #01 JCN BRK
 	#00 ;draw-filepath JSR2
 	;trap JSR2
 
@@ -568,20 +542,24 @@ RTN
 
 RTN
 
-	( Determine whether to fill with the literal byte or to interpret as hex digits )
+( Determine whether to fill with the literal byte or to interpret as hex digits )
+
 @interpret-ascii ( ascii -- byte invalid? )
+
 	.selection/input LDZ #02 = ,&return JCN ( If in text mode, skip parsing )
-			;key-to-value JSR2
-			DUP #ff = ,&invalid JCN ( If it wasn't a valid hex char then bail )
-			.selection/from LDZ2 LDA ( Read first byte of selection )
-				.selection/input LDZ ;set-nibble JSR2 ( Combine with hex byte )
-				.selection/input TOGGLE ( Change whether we're editing high or low nibble )
+
+	;key-to-value JSR2
+	DUP #ff = ,&invalid JCN ( If it wasn't a valid hex char then bail )
+	.selection/from LDZ2 LDA ( Read first byte of selection )
+		.selection/input LDZ ;set-nibble JSR2 ( Combine with hex byte )
+		.selection/input TOGGLE ( Change whether we're editing high or low nibble )
+
 	&return #00 RTN
 	&invalid POP #01 RTN
 
 @fill-selection ( byte -- )
-	STH
 
+	STH
 	( Fill selection with byte )
 	.selection/to LDZ2 INC2 .selection/from LDZ2
 	&loop
@@ -592,8 +570,6 @@ RTN
 
 RTN
 
-( Modified from calc.tal to return ff on invalid input )
-( Decode the ascii chars 0-9a-fA-F to the corresponding nibble )
 @key-to-value ( key -- value )
 
 	DUP #2f > OVR #3a < #0101 !! ,&no-num JCN
@@ -610,10 +586,13 @@ RTN
 RTN
 
 @set-nibble ( nibble byte hl -- combined )
+
 	,&high JCN ( set low nibble )
 		#f0 AND ORA RTN
 	&high ( set high nibble )
-		#0f AND SWP #40 SFT ORA RTN
+		#0f AND SWP #40 SFT ORA 
+
+RTN
 
 @reset-selection ( -- )
 
@@ -723,6 +702,15 @@ RTN
 RTN
 	&y $2 &row $2
 
+@get-byte-color ( id* )
+
+	DUP2 MEMORY .data/length LDZ2 ++ << ,&exists JCN
+		POP2 #03 RTN
+		&exists
+	;is-selected JSR2 #07 MUL #01 +
+
+RTN
+
 @draw-byte ( x* y* byte color -- )
 
 	#06 .Screen/auto DEO
@@ -779,10 +767,10 @@ RTN
 		&hor
 			DUP 2* TOS ;&x LDA2 ++ .Screen/x DEO2
 			( get pixel )
-			GET-ITER
+			OVR2 NIP OVR SWP
 			( ch 1 )
 			TOS ;&addr LDA2 ++ LDA
-			SWP #07 SWP - SFT #01 AND
+			SWP #07 SWP - SFT 2MOD
 			.Screen/pixel DEO
 			INC GTHk ,&hor JCN
 		POP2
@@ -805,9 +793,9 @@ RTN
 
 	#08 #00
 	&loop
-		( state ) DUP #07 SWP - [ .selection/from LDZ2 LDA ] SWP SFT #01 AND STH
+		( state ) DUP #07 SWP - [ .selection/from LDZ2 LDA ] SWP SFT 2MOD STH
 		( y ) DUP 4/ TOS 8** .menu-frame/y LDZ2 ++ STH2
-		( x ) DUP #03 AND TOS 8** .menu-frame/x LDZ2 ++
+		( x ) DUP 4MOD TOS 8** .menu-frame/x LDZ2 ++
 		STH2r STHr #01 ,draw-bit JSR
 		INC GTHk ,&loop JCN
 	POP2
@@ -868,49 +856,23 @@ RTN
 
 RTN
 
-@get-byte-color ( id* )
-
-	DUP2 MEMORY .data/length LDZ2 ++ << ,&exists JCN
-		POP2 #03 RTN
-		&exists
-	;is-selected JSR2 #07 MUL #01 +
-
-RTN
-
 @char-addr ( char -- addr* )
 
 	#20 - TOS 10** ;font ++
 
 RTN
 
-@clear ( -- )
-
-	MEMORY DUP2 MEMORY-SIZE ++ SWP2
-	&loop
-		DUP2 #00 ROT ROT STA
-		INC2 GTH2k ,&loop JCN
-	POP2 POP2
-
-RTN
-
 ( file )
 
-@new-file ( default* -- )
+@new-file ( -- )
 
 	( clear )
-	;clear JSR2
+	MEMORY MEMORY-SIZE ;mclr JSR2
 	MEMORY ;select JSR2
 	#00 ;draw-filepath JSR2
-
-	STH2
-	#0c #00
-	&loop
-		DUP DUP TOS STH2kr ++ LDA
-		SWP .path/name + STZ
-		INC GTHk ,&loop JCN
-	( end ) #00 SWP .path/name + STZ
-	.path/length STZ
-	POP2r
+	( rename to untitled.txt )
+	;path/name #0020 ;mclr JSR2
+	;untitled-txt ;path/name #000c ;mcpy JSR2
 	RESET-STATE
 	#0000 .selection/scroll STZ2
 	#0008 .data/length STZ2
@@ -953,32 +915,28 @@ RTN
 
 @copy-string-snarf ( -- )
 
-	;string-snarf/data STH2
-	.selection/to LDZ2 INC2 .selection/from LDZ2
-	&loop
-		( convert byte to string )
-		( get char ) LDAk #04 SFT ;print-hex/parse JSR2
-		( store ) STH2kr STA INC2r
-		( get char ) LDAk #0f AND ;print-hex/parse JSR2
-		( store ) STH2kr STA INC2r
-
-		( linebreak )
-		DUP2 .selection/from LDZ2 --
-		DUP2 #000f AND2 #000f !! ,&no-linebreak JCN
-			#0d STH2kr STA INC2r ,&no-space JMP &no-linebreak
-		DUP2 #0001 AND2 #0001 !! ,&no-space JCN
-			#20 STH2kr STA INC2r &no-space
-		POP2
-
-		INC2 GTH2k ,&loop JCN
-	POP2 POP2
-	STH2r ;string-snarf/data -- ;string-snarf/length STA2
-
 	;snarf-txt .File/name DEO2
-	;string-snarf/length LDA2 .File/length DEO2
-	;string-snarf/data .File/save DEO2
+	#0001 .File/length DEO2
+	.selection/to LDZ2 INC2 .selection/from LDZ2
+	&stream
+		LDAk #04 SFT ;print-hex/parse JSR2 ,&write JSR
+		LDAk #0f AND ;print-hex/parse JSR2 ,&write JSR
+		( formatting )
+		DUP2 .selection/from LDZ2 --
+		DUP2 #000f AND2 #000f !! ,&no-linebreak JCN 
+			#0d ,&write JSR ,&end JMP 
+			&no-linebreak
+		DUP2 #0001 AND2 #0001 !! ,&no-space JCN 
+			#20 ,&write JSR
+			&no-space
+		&end
+		POP2
+		INC2 GTH2k ,&stream JCN
+	POP2 POP2
 
 RTN
+	&write ;&b STA ;&b .File/save DEO2 RTN
+	&b $1
 
 @paste-snarf ( -- )
 
@@ -1041,19 +999,68 @@ RTN
 RTN
 
 @print-hex ( value* -- )
-
-	&short ( value* -- )
-		SWP ,&echo JSR
-	&byte ( value -- )
-		,&echo JSR
+	
+	SWP ,&byte JSR 
+	&byte ( byte -- )
+		STHk #04 SFT ,&parse JSR #18 DEO
+		STHr #0f AND ,&parse JSR #18 DEO
 	RTN
+	&parse ( byte -- char ) DUP #09 GTH ,&above JCN #30 + RTN 
+	&above #57 + RTN
 
-	&echo ( value -- )
-	STHk #04 SFT ,&parse JSR .Console/write DEO
-	STHr #0f AND ,&parse JSR .Console/write DEO
-	RTN
-	&parse ( value -- char )
-		DUP #09 GTH ,&above JCN #30 + RTN &above #09 - #60 + RTN
+RTN
+
+( string generics )
+
+@slen ( str* -- len* )
+
+	DUP2 ,scap JSR SWP2 --
+
+RTN
+
+@scap ( str* -- str-end* )
+
+	( clamp ) LDAk #00 ! JMP RTN
+	&while INC2 LDAk ,&while JCN
+
+RTN
+
+@sput ( str* char -- )
+
+	ROT ROT ,scap JSR STA
+
+RTN
+
+@spop ( str* -- )
+
+	( clamp ) LDAk #00 ! JMP RTN
+	#00 ROT ROT ,scap JSR #0001 -- STA
+
+RTN
+
+( memory generics )
+
+@mclr ( addr* len* -- )
+
+	OVR2 ++ SWP2
+	&loop
+		STH2k #00 STH2r STA
+		INC2 GTH2k ,&loop JCN
+	POP2 POP2
+
+RTN
+
+@mcpy ( src* dst* len* -- )
+
+	SWP2 STH2 SWP2 STH2
+	#0000
+	&loop 
+		( src ) STH2kr LDA
+		( dst ) OVR2r STH2r STA
+		( inc ) INC2r SWP2r INC2r SWP2r
+		INC2 GTH2k ,&loop JCN
+	POP2 POP2
+	POP2r POP2r
 
 RTN
 
@@ -1083,7 +1090,3 @@ RTN
 	007c 8280 f080 827c 007c 8280 f080 8080
 
 ~src/font.tal
-
-@string-snarf
-	&length $2
-	&data $100
