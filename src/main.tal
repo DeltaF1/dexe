@@ -17,9 +17,6 @@
 
 ~src/utils.tal
 
-%SET-STATE   { #01 .state/changed STZ ;draw-state JSR2 }
-%RESET-STATE { #00 .state/changed STZ ;draw-state JSR2 }
-
 %MEMORY { #8000 }
 %MEMORY-SIZE { #7000 }
 
@@ -291,7 +288,7 @@ BRK
 		;load-file JSR2
 		POP BRK &no-open
 	DUP [ LIT 's ] ! ,&no-save JCN
-		;path/name ;save-file JSR2
+		;save-file JSR2
 		POP BRK  &no-save
 	( snarf )
 	DUP [ LIT 'c ] ! ,&no-copy JCN
@@ -472,13 +469,39 @@ BRK
 		POP2 POP2 BRK
 		&continue
 
+
 	.menu-frame/y LDZ2 -- 8// NIP STH
 	.menu-frame/x LDZ2 -- 8// NIP STHr
 
-	( bitpad )
-	OVR #20 < ;on-touch-menu-bitpad JCN2
 
-	DEBUG2
+	( bitpad )
+
+	OVR #04 < ;on-touch-menu-bitpad JCN2
+
+	POP
+	DUP #05 ! ,&no-inc JCN
+		.selection/from LDZ2 LDA INC ;fill-selection JSR2
+		&no-inc
+	DUP #06 ! ,&no-dec JCN
+		.selection/from LDZ2 LDA #01 - ;fill-selection JSR2
+		&no-dec
+	DUP #07 ! ,&no-rol JCN
+		.selection/from LDZ2 LDA ROL ;fill-selection JSR2
+		&no-rol
+	DUP #08 ! ,&no-ror JCN
+		.selection/from LDZ2 LDA ROR ;fill-selection JSR2
+		&no-ror
+	DUP #1a ! ,&no-make JCN
+		;new-file JSR2
+		&no-make
+	DUP #1b ! ,&no-load JCN
+		;load-file JSR2
+		&no-load
+	DUP #1d ! ,&no-save JCN
+		;save-file JSR2
+		&no-save
+	POP
+	RELEASE-MOUSE
 
 BRK
 
@@ -566,6 +589,7 @@ RTN
 		DUP2 STHkr ROT ROT STA
 		INC2 GTH2k ,&loop JCN
 	POP2 POP2 POPr
+	#01 .state/changed STZ
 	;redraw JSR2
 
 RTN
@@ -753,6 +777,16 @@ RTN
 
 RTN
 
+@draw-sprite ( addr* color -- )
+	
+	STH .Screen/addr DEO2
+	.Screen/y DEI2
+	STHr .Screen/sprite DEOk DEO
+	.Screen/y DEO2
+	.Screen/x DEI2k #0008 ++ ROT DEO2
+
+RTN
+
 @draw-tile ( x* y* addr* color -- )
 
 	POP
@@ -784,8 +818,22 @@ RTN
 
 	( filepath )
 	#01 ;draw-filepath JSR2
-
+	( bitpad )
 	;draw-bitpad JSR2
+	( controls )
+	.menu-frame/x LDZ2 #0028 ++ .Screen/x DEO2
+	.menu-frame/y LDZ2 .Screen/y DEO2
+	AUTO-Y-ADDR
+	LIT '+ ;char-addr JSR2 #01 ;draw-sprite JSR2
+	LIT '- ;char-addr JSR2 #01 ;draw-sprite JSR2
+	LIT '< ;char-addr JSR2 #01 ;draw-sprite JSR2
+	LIT '> ;char-addr JSR2 #01 ;draw-sprite JSR2
+	.menu-frame/x2 LDZ2 #0020 -- .Screen/x DEO2
+	;font/make #01 ;draw-sprite JSR2
+	;font/load #01 ;draw-sprite JSR2
+	.Screen/x DEI2k #0008 ++ ROT DEO2
+	;font/save #01 .state/changed LDZ + ;draw-sprite JSR2
+	AUTO-NONE
 
 RTN
 
@@ -809,10 +857,6 @@ RTN
 	( y ) .Screen/y DEO2
 	( x ) .Screen/x DEO2
 	STHr .Screen/sprite DEO
-
-RTN
-
-@draw-state ( -- )
 
 RTN
 
@@ -876,9 +920,9 @@ RTN
 	( rename to untitled.txt )
 	;path/name #0020 ;mclr JSR2
 	;untitled-txt ;path/name #000c ;mcpy JSR2
-	RESET-STATE
 	#0000 .selection/scroll STZ2
 	#0008 .data/length STZ2
+	#00 .state/changed STZ
 	;redraw JSR2
 
 RTN
@@ -890,7 +934,7 @@ RTN
 	MEMORY-SIZE         .File/length DEO2
 	MEMORY       .File/load DEO2
 	.File/success DEI2 #0001 MIN2 .data/length STZ2
-	RESET-STATE
+	#00 .state/changed STZ
 	;reset-selection JSR2
 
 RTN
@@ -900,7 +944,8 @@ RTN
 	;path/name .File/name DEO2
 	.data/length LDZ2 .File/length DEO2
 	MEMORY .File/save DEO2
-	RESET-STATE
+	#00 .state/changed STZ
+	;redraw JSR2
 
 RTN
 
@@ -1081,6 +1126,13 @@ RTN
 	0607 0707 0000 0000
 
 @untitled-txt  "untitled.chr $1
+
+@make-icn
+	00fe 8282 8282 8282 8282 8282 848a f400
+@load-icn
+	00fe d6aa d6aa d6aa d6aa d6aa d4aa f400
+@save-icn
+	0010 1092 9254 5428 d628 5454 9292 1000
 
 @font-hex
 	007c 8282 8282 827c 0030 1010 1010 1010
