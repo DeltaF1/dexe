@@ -821,7 +821,10 @@ RTN
 	STH
 	.file-frame/x LDZ2
 	.file-frame/y LDZ2
-	;path/name STHr
+	;path/name ( scroll )
+		DUP2 ;slen JSR2 #0014 >> TOS 
+		;path/name ;slen JSR2 #0014 -- ** ++
+	STHr
 		;draw-text JSR2
 
 	( start byte )
