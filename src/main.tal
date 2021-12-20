@@ -465,13 +465,10 @@ BRK
 		POP2 POP2 BRK
 		&continue
 
-
 	.menu-frame/y LDZ2 -- 8// NIP STH
 	.menu-frame/x LDZ2 -- 8// NIP STHr
 
-
 	( bitpad )
-
 	OVR #04 < ;on-touch-menu-bitpad JCN2
 
 	POP
@@ -694,28 +691,35 @@ RTN
 	;&row STA2
 	;&y STA2
 
+	AUTO-YADDR
+	.frame/x LDZ2 .Screen/x DEO2
+	;&y LDA2 .Screen/y DEO2
+
 	#08 #00
 	&bytes-loop
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
-		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
-		( y ) ;&y LDA2 STH2
-		( x-block ) DUP TOS 2** ;pos-table ++ LDA2 .frame/x LDZ2 ++
-		STH2r STHr STHr ;draw-byte JSR2
+		( byte ) DUP TOS ;&row LDA2 ++ LDA
+			STHr ;draw-byte JSR2
+		( space every second )
+		DUP #01 AND #00 = ,&no-pad JCN
+			.Screen/x DEI2k #0008 ++ ROT DEO2
+			&no-pad
 		INC GTHk ,&bytes-loop JCN
 	POP2
+
+	.char-frame/x LDZ2 .Screen/x DEO2
 
 	#08 #00
 	&chars-loop
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
-		( byte ) DUP TOS ;&row LDA2 ++ LDA STH
-		( y ) ;&y LDA2 STH2
-		( x-block ) DUP TOS 8** .char-frame/x LDZ2 ++
-		STH2r STHr STHr ;draw-char JSR2
+		( byte ) DUP TOS ;&row LDA2 ++ LDA 
+			STHr ;draw-char JSR2
 		INC GTHk ,&chars-loop JCN
 	POP2
+	AUTO-NONE
 
 	.tile-frame/x LDZ2
-	.Screen/y DEI2 #0010 --
+	.Screen/y DEI2 
 	;&row LDA2 #01
 		;draw-tile JSR2
 
@@ -728,58 +732,6 @@ RTN
 		POP2 #03 RTN
 		&exists
 	;is-selected JSR2 #07 MUL #01 +
-
-RTN
-
-@draw-byte ( x* y* byte color -- )
-
-	#06 .Screen/auto DEO
-	STH STH
-	.Screen/y DEO2
-	.Screen/x DEO2
-	STHr
-	DUP
-		( hn )
-		#04 SFT ,&parse JSR #18 - TOS 10** ;font-hex ++ .Screen/addr DEO2
-		STHkr .Screen/sprite DEOk DEO
-	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
-	.Screen/y DEI2 #0010 -- .Screen/y DEO2
-		( ln )
-		#0f AND ,&parse JSR #18 - TOS 10** ;font-hex ++ .Screen/addr DEO2
-		STHr .Screen/sprite DEOk DEO
-	#00 .Screen/auto DEO
-	RTN
-	&parse ( value -- char )
-		DUP #09 > ,&above JCN
-			#30 + RTN
-		&above
-			#09 - #60 + RTN
-
-RTN
-
-@draw-char ( x* y* char color -- )
-
-	#06 .Screen/auto DEO
-	STH STH .Screen/y DEO2 .Screen/x DEO2 
-	STHr
-	DUP #1f > OVR #80 < AND ,&visible JCN
-		POP ;font/dot ,&resume JMP
-	&visible
-		;char-addr JSR2
-	&resume
-	.Screen/addr DEO2
-	STHr .Screen/sprite DEOk DEO
-	#00 .Screen/auto DEO
-
-RTN
-
-@draw-sprite ( addr* color -- )
-	
-	STH .Screen/addr DEO2
-	.Screen/y DEI2
-	STHr .Screen/sprite DEOk DEO
-	.Screen/y DEO2
-	.Screen/x DEI2k #0008 ++ ROT DEO2
 
 RTN
 
@@ -814,16 +766,17 @@ RTN
 
 	( filepath )
 	#01 ;draw-filepath JSR2
+	;draw-position JSR2
 	( bitpad )
 	;draw-bitpad JSR2
 	( controls )
 	.menu-frame/x LDZ2 #0028 ++ .Screen/x DEO2
 	.menu-frame/y LDZ2 .Screen/y DEO2
-	AUTO-Y-ADDR
-	LIT '+ ;char-addr JSR2 #01 ;draw-sprite JSR2
-	LIT '- ;char-addr JSR2 #01 ;draw-sprite JSR2
-	LIT '< ;char-addr JSR2 #01 ;draw-sprite JSR2
-	LIT '> ;char-addr JSR2 #01 ;draw-sprite JSR2
+	AUTO-YADDR
+	LIT '+ #01 ;draw-char JSR2
+	LIT '- #01 ;draw-char JSR2
+	LIT '< #01 ;draw-char JSR2
+	LIT '> #01 ;draw-char JSR2
 	.menu-frame/x2 LDZ2 #0020 -- .Screen/x DEO2
 	;font/make #01 ;draw-sprite JSR2
 	;font/load #01 ;draw-sprite JSR2
@@ -858,52 +811,85 @@ RTN
 
 @draw-filepath ( color -- )
 
-	STH
-	.file-frame/x LDZ2
-	.file-frame/y LDZ2
+	.file-frame/x LDZ2 .Screen/x DEO2
+	.file-frame/y LDZ2 .Screen/y DEO2
+
+	AUTO-YADDR
 	;path/name ( scroll )
 		DUP2 ;slen JSR2 #0014 >> TOS 
 		;path/name ;slen JSR2 #0014 -- ** ++
-	STHr
-		;draw-text JSR2
-
-	( start byte )
-	.selection/to LDZ2 ;data -- STH STH
-	.file-frame/x2 LDZ2 #0048 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
-	.file-frame/x2 LDZ2 #0038 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
-	( / )
-	.file-frame/x2 LDZ2 #0028 -- .file-frame/y LDZ2 LIT '/ #03 ;draw-char JSR2
-	( end byte )
-	.length LDZ2 #0001 -- STH STH
-	.file-frame/x2 LDZ2 #0020 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
-	.file-frame/x2 LDZ2 #0010 -- .file-frame/y LDZ2 STHr #01 ;draw-byte JSR2
+	ROT
+		;draw-str JSR2
+	AUTO-NONE
 
 RTN
 
-@draw-text ( x* y* addr* color -- )
+@draw-position ( -- )
 
-	#07 .Screen/auto DEO
+	AUTO-YADDR
+	.file-frame/x2 LDZ2 #0048 -- .Screen/x DEO2 
+	.file-frame/y LDZ2 .Screen/y DEO2
+	.selection/to LDZ2 ;data -- #01 ;draw-short JSR2
+	LIT '/ #03 ;draw-char JSR2
+	.length LDZ2 #0001 -- #01 ;draw-short JSR2
+	AUTO-NONE
+
+RTN
+
+( primitives )
+
+@draw-short ( short* color -- )
+
 	STH
-	SWP2 .Screen/y DEO2
-	SWP2 .Screen/x DEO2
+	SWP STHkr ,draw-byte JSR
+	STHr ,draw-byte JSR
+
+RTN
+
+@draw-byte ( byte color -- )
+
+	STH
+	DUP #04 SFT ,&parse JSR STHkr ,draw-char JSR
+	#0f AND ,&parse JSR STHr ,draw-char JSR
+	RTN
+	&parse ( value -- char )
+		DUP #09 > ,&above JCN
+			#30 + RTN
+		&above
+			#09 - #60 + RTN
+
+RTN
+
+@draw-char ( char color -- )
+
+	SWP
+	[ #20 - #00 SWP #40 SFT2 ;font ++ ] .Screen/addr DEO2
+	.Screen/sprite DEOk DEO
+	.Screen/y DEI2 #0010 -- .Screen/y DEO2
+	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+
+JMP2r
+
+@draw-sprite ( addr* color -- )
+	
+	STH .Screen/addr DEO2
+	.Screen/y DEI2
+	STHr .Screen/sprite DEOk DEO
+	.Screen/y DEO2
+	.Screen/x DEI2k #0008 ++ ROT DEO2
+
+RTN
+
+@draw-str ( str* color -- )
+
+	STH
 	&while
-		LDAk ;char-addr JSR2 .Screen/addr DEO2
-		STHkr .Screen/sprite DEO
-		.Screen/x DEI2 #0008 -- .Screen/x DEO2
-		STHkr .Screen/sprite DEO
-		.Screen/y DEI2 #0010 -- .Screen/y DEO2
+		LDAk STHkr ,draw-char JSR
 		INC2 LDAk ,&while JCN
 	POP2
 	POPr
-	#00 .Screen/auto DEO
 
-RTN
-
-@char-addr ( char -- addr* )
-
-	#20 - TOS 10** ;font ++
-
-RTN
+JMP2r
 
 ( file )
 
@@ -1106,6 +1092,8 @@ RTN
 
 RTN
 
+@untitled-txt  "untitled.chr $1
+
 @cursor-icn
 	80c0 e0f0 f8e0 1000
 @bit-icns
@@ -1118,25 +1106,15 @@ RTN
 	0000 0101 0202 0203
 	0303 0404 0505 0606
 	0607 0707 0000 0000
-
-@untitled-txt  "untitled.chr $1
-
 @make-icn
-	00fe 8282 8282 8282 8282 8282 848a f400
+	00fe 8282 8282 8282 
+	8282 8282 848a f400
 @load-icn
-	00fe d6aa d6aa d6aa d6aa d6aa d4aa f400
+	00fe d6aa d6aa d6aa 
+	d6aa d6aa d4aa f400
 @save-icn
-	0010 1092 9254 5428 d628 5454 9292 1000
-
-@font-hex
-	007c 8282 8282 827c 0030 1010 1010 1010
-	007c 8202 7c80 80fe 007c 8202 1c02 827c
-	000c 1424 4484 fe04 00fe 8080 7c02 827c
-	007c 8280 fc82 827c 007c 8202 1e02 0202
-	007c 8282 7c82 827c 007c 8282 7e02 827c
-	007c 8202 7e82 827e 00fc 8282 fc82 82fc
-	007c 8280 8080 827c 00fc 8282 8282 82fc
-	007c 8280 f080 827c 007c 8280 f080 8080
+	0010 1092 9254 5428 
+	d628 5454 9292 1000
 
 ~src/font.tal
 
