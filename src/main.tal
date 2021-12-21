@@ -72,6 +72,7 @@
 	#0188 .Screen/height DEO2
 	( GBA #00f0 .Screen/width DEO2 #00a0 .Screen/height DEO2 )
 
+
 	( frame )
 	.Screen/width DEI2 2// #0078 -- DUP2 .frame/x STZ2
 		#00f0 ++ .frame/x2 STZ2
@@ -658,6 +659,7 @@ RTN
 
 	.file-frame/x LDZ2 .file-frame/x2 LDZ2 .file-frame/y2 LDZ2 #03 ;line-hor JSR2
 	;draw-menu JSR2
+	;draw-position JSR2
 
 RTN
 
@@ -762,10 +764,10 @@ RTN
 	LIT '> #01 ;draw-char JSR2
 
 	.menu-frame/x2 LDZ2 #0020 -- .Screen/x DEO2
-	;font/make #01 ;draw-sprite JSR2
-	;font/load #01 ;draw-sprite JSR2
+	;make-icn #01 ;draw-sprite JSR2
+	;load-icn #01 ;draw-sprite JSR2
 	.Screen/x DEI2k #0008 ++ ROT DEO2
-	;font/save #01 .state/changed LDZ + ;draw-sprite JSR2
+	;save-icn #01 .state/changed LDZ + ;draw-sprite JSR2
 
 	AUTO-NONE
 
@@ -1026,15 +1028,6 @@ RTN
 
 RTN
 
-@print-str ( string* -- )
-
-	#0001 SUB2 
-	&while
-		INC2 LDAk DUP #18 DEO ,&while JCN 
-	POP2
-
-RTN
-
 ( string generics )
 
 @slen ( str* -- len* )
@@ -1091,18 +1084,6 @@ RTN
 
 @untitled-txt  "untitled.chr $1
 
-@cursor-icn
-	80c0 e0f0 f8e0 1000
-@bit-icns
-	3844 8282 8244 3800
-	387c fefe fe7c 3800
-@pos-table
-	0000 0010 0028 0038
-	0050 0060 0078 0088
-@touch-table
-	0000 0101 0202 0203
-	0303 0404 0505 0606
-	0607 0707 0000 0000
 @make-icn
 	00fe 8282 8282 8282 
 	8282 8282 848a f400
@@ -1112,6 +1093,15 @@ RTN
 @save-icn
 	0010 1092 9254 5428 
 	d628 5454 9292 1000
+@cursor-icn
+	80c0 e0f0 f8e0 1000
+@bit-icns
+	3844 8282 8244 3800
+	387c fefe fe7c 3800
+@touch-table
+	0000 0101 0202 0203
+	0303 0404 0505 0606
+	0607 0707 0000 0000
 
 ~src/font.tal
 
