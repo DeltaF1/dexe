@@ -793,7 +793,7 @@ RTN
 		DUP2 ;slen JSR2 #0014 >> TOS 
 		;path/name ;slen JSR2 #0014 -- ** ++
 	ROT
-		;draw-str JSR2
+		,draw-str JSR
 	AUTO-NONE
 
 RTN
@@ -803,14 +803,25 @@ RTN
 	AUTO-YADDR
 	.file-frame/x2 LDZ2 #0048 -- .Screen/x DEO2 
 	.file-frame/y LDZ2 .Screen/y DEO2
-	.selection/to LDZ2 ;data -- #01 ;draw-short JSR2
-	LIT '/ #03 ;draw-char JSR2
-	.length LDZ2 #0001 -- #01 ;draw-short JSR2
+	.selection/to LDZ2 ;data -- #01 ,draw-short JSR
+	LIT '/ #03 ,draw-char JSR
+	.length LDZ2 #0001 -- #01 ,draw-short JSR
 	AUTO-NONE
 
 RTN
 
 ( primitives )
+
+@draw-str ( str* color -- )
+
+	STH
+	&while
+		LDAk STHkr ,draw-char JSR
+		INC2 LDAk ,&while JCN
+	POP2
+	POPr
+
+JMP2r
 
 @draw-short ( short* color -- )
 
@@ -836,11 +847,7 @@ RTN
 
 @draw-char ( char color -- )
 
-	SWP
-	[ #20 - #00 SWP #40 SFT2 ;font ++ ] .Screen/addr DEO2
-	.Screen/sprite DEOk DEO
-	.Screen/y DEI2 #0010 -- .Screen/y DEO2
-	.Screen/x DEI2 #0008 ++ .Screen/x DEO2
+	SWP [ #20 - #00 SWP #40 SFT2 ;font ++ ] ROT ,draw-sprite JSR
 
 JMP2r
 
@@ -853,17 +860,6 @@ JMP2r
 	.Screen/x DEI2k #0008 ++ ROT DEO2
 
 RTN
-
-@draw-str ( str* color -- )
-
-	STH
-	&while
-		LDAk STHkr ,draw-char JSR
-		INC2 LDAk ,&while JCN
-	POP2
-	POPr
-
-JMP2r
 
 ( file )
 
