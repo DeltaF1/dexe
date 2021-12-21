@@ -38,7 +38,8 @@
 @path
 	&name $20
 @selection
-	&from $2 &to $2 &scroll $2 &input $1
+	&from $2 &to $2 &scroll $2 
+	&mode $1 &nibble $1
 @frame
 	&x $2 &y $2 &x2 $2 &y2 $2
 @file-frame
@@ -66,7 +67,9 @@
 	;untrap JSR2
 
 	( set size )
-	( default ) #0110 .Screen/width DEO2 #0188 .Screen/height DEO2
+	( default ) 
+	#0110 .Screen/width DEO2 
+	#0188 .Screen/height DEO2
 	( GBA #00f0 .Screen/width DEO2 #00a0 .Screen/height DEO2 )
 
 	( frame )
@@ -109,8 +112,6 @@
 	( theme support )
 	;load-theme JSR2
 
-	( Which frame to type into )
-	#01 .selection/input STZ
 BRK
 
 @on-console ( -> )
@@ -188,7 +189,7 @@ BRK
 
 	( arrows )
 	.Controller/button DEI
-	DUP #44 ! ,&no-left-sel JCN
+	DUP #44 ! ,&no-left-sel JCN 
 		.selection/to LDZ2 #0001 -- ;select-until JSR2 POP BRK
 		&no-left-sel
 	DUP #84 ! ,&no-right-sel JCN
@@ -218,6 +219,9 @@ BRK
 	DUP #21 ! ,&no-ctrl-down JCN
 		.selection/from LDZ2 #0040 ++ ;select JSR2 POP BRK
 		&no-ctrl-down
+	DUP #08 ! ,&no-esc JCN
+		;reset-selection JSR2
+		&no-esc
 
 	( ctrl )
 	#01 AND ;on-control JCN2
@@ -225,33 +229,20 @@ BRK
 	( keys )
 	.Controller/key DEI
 	DUP LIT '+ ! ,&no-inc JCN
-		.selection/from LDZ2 LDA INC ;fill-selection JSR2
-		POP BRK
+		.selection/from LDZ2 LDA INC ;fill-selection JSR2 POP BRK
 		&no-inc
 	DUP LIT '- ! ,&no-dec JCN
-		.selection/from LDZ2 LDA #01 - ;fill-selection JSR2
-		POP BRK
+		.selection/from LDZ2 LDA #01 - ;fill-selection JSR2 POP BRK
 		&no-dec
-	DUP #1b ! ,&no-esc JCN
-		;reset-selection JSR2 POP BRK
-		&no-esc
-	DUP #1f > OVR #7f < #0101 !! ,&no-char JCN
-		DUP ;interpret-ascii JSR2 ( ascii ascii -- ascii byte invalid? )
-			( If invalid=1, no byte is provided )
-			,&no-char JCN
-			;fill-selection JSR2
-		&no-char
 	DUP #0d ! ,&no-enter JCN
 		.selection/from LDZ2 ;memsftr JSR2
 		&no-enter
 	DUP #08 ! ,&no-backspace JCN
 		.selection/from LDZ2 ;memsftl JSR2
 		&no-backspace
-	DUP #09 ! ,&no-tab JCN
-		.selection/input LDZk
-			#01 SFT #00 EQU #01 ADD ( Toggle between 0/1 and 2 )
-		SWP STZ
-		&no-tab
+	DUP #1f > OVR #7f < #0101 !! ,&no-char JCN
+		DUP ;input JSR2
+		&no-char
 	POP
 
 BRK
@@ -384,20 +375,17 @@ BRK
 
 	.Mouse/state DEI .cursor/last LDZ
 	DUP2 #0100 !! ,&no-down JCN
-		( Set as active input pane )
-		#01 .selection/input STZ
-		( select from )
-		 STH2kr ;select JSR2
+		STH2kr ;select JSR2
 		&no-down
 	DUP2 #0001 !! ,&no-up JCN
-		( select to )
 		STH2kr ;select-until JSR2
 		&no-up
 	DUP2 #0101 !! ,&no-drag JCN
-		( select to )
 		STH2kr ;select-until JSR2
 		&no-drag
 	POP2
+
+	#00 ;set-mode JSR2
 	( pop addr* ) POP2r
 	.Mouse/state DEI .cursor/last STZ
 
@@ -413,20 +401,18 @@ BRK
 
 	.Mouse/state DEI .cursor/last LDZ
 	DUP2 #0100 !! ,&no-down JCN
-		( Set as active input pane )
-		#02 .selection/input STZ
-		( select from )
-		 STH2kr ;select JSR2
+		STH2kr ;select JSR2
 		&no-down
 	DUP2 #0001 !! ,&no-up JCN
-		( select to )
 		STH2kr ;select-until JSR2
 		&no-up
 	DUP2 #0101 !! ,&no-drag JCN
-		( select to )
 		STH2kr ;select-until JSR2
 		&no-drag
 	POP2
+
+	#01 ;set-mode JSR2
+
 	( pop addr* ) POP2r
 	.Mouse/state DEI .cursor/last STZ
 
@@ -509,6 +495,38 @@ BRK
 
 BRK
 
+@input ( byte -- )
+
+	.selection/mode LDZ ,fill-selection JCN
+
+	DUP ;char-hex JSR2 #ff = ,&skip JCN
+	.selection/nibble LDZ ,&low JCN
+		#01 .selection/nibble STZ
+		;char-hex JSR2 #40 SFT .selection/from LDZ2 LDA #0f AND + ;fill-selection JSR2
+		RTN
+	&low
+		#00 .selection/nibble STZ
+		;char-hex JSR2 .selection/from LDZ2 LDA #f0 AND + ;fill-selection JSR2
+		RTN
+	&skip
+		POP
+
+RTN
+
+@fill-selection ( byte -- )
+
+	STH
+	( Fill selection with byte )
+	.selection/to LDZ2 INC2 .selection/from LDZ2
+	&loop
+		DUP2 STHkr ROT ROT STA
+		INC2 GTH2k ,&loop JCN
+	POP2 POP2 POPr
+	#01 .state/changed STZ
+	;redraw JSR2
+
+RTN
+
 @select ( id* -- )
 
 	DUP2 .selection/from LDZ2 == ,&skip JCN
@@ -517,6 +535,7 @@ BRK
 	( valid )
 	DUP2 .selection/from STZ2
 	.selection/to STZ2
+	#00 .selection/nibble STZ
 	;follow-selection JSR2
 	;redraw JSR2
 	RTN
@@ -558,62 +577,20 @@ RTN
 
 RTN
 
-( Determine whether to fill with the literal byte or to interpret as hex digits )
+@set-mode ( mode -- )
 
-@interpret-ascii ( ascii -- byte invalid? )
-
-	.selection/input LDZ #02 = ,&return JCN ( If in text mode, skip parsing )
-
-	;key-to-value JSR2
-	DUP #ff = ,&invalid JCN ( If it wasn't a valid hex char then bail )
-	.selection/from LDZ2 LDA ( Read first byte of selection )
-		.selection/input LDZ ;set-nibble JSR2 ( Combine with hex byte )
-		.selection/input TOGGLE ( Change whether we're editing high or low nibble )
-
-	&return #00 RTN
-	&invalid POP #01 RTN
-
-@fill-selection ( byte -- )
-
-	STH
-	( Fill selection with byte )
-	.selection/to LDZ2 INC2 .selection/from LDZ2
-	&loop
-		DUP2 STHkr ROT ROT STA
-		INC2 GTH2k ,&loop JCN
-	POP2 POP2 POPr
-	#01 .state/changed STZ
-	;redraw JSR2
-
-RTN
-
-@key-to-value ( key -- value )
-
-	DUP #2f > OVR #3a < #0101 !! ,&no-num JCN
-		#30 - RTN
-		&no-num
-	DUP #60 > OVR #67 < #0101 !! ,&no-lc JCN
-		#57 - RTN ( #61 - #0a + )
-		&no-lc
-	DUP #40 > OVR #47 < #0101 !! ,&no-uc JCN
-		#37 - RTN ( #41 - #0a + )
-		&no-uc
-	POP #ff
-
-RTN
-
-@set-nibble ( nibble byte hl -- combined )
-
-	,&high JCN ( set low nibble )
-		#f0 AND ORA RTN
-	&high ( set high nibble )
-		#0f AND SWP #40 SFT ORA 
+	DUP .selection/mode LDZ ! ,&changed JCN
+		POP RTN
+		&changed
+	.selection/mode STZ
+	;draw-menu JSR2
 
 RTN
 
 @reset-selection ( -- )
 
 	.selection/from LDZ2 .selection/to STZ2
+	#00 .selection/nibble STZ
 	;redraw JSR2
 
 RTN
@@ -713,6 +690,7 @@ RTN
 	&chars-loop
 		( color ) DUP TOS ;&row LDA2 ++ ;get-byte-color JSR2 STH
 		( byte ) DUP TOS ;&row LDA2 ++ LDA 
+		( dot invalids ) LIT '. OVR IS-VALID JMP SWP POP
 			STHr ;draw-char JSR2
 		INC GTHk ,&chars-loop JCN
 	POP2
@@ -764,38 +742,34 @@ RTN
 
 @draw-menu ( -- )
 
-	( filepath )
-	#01 ;draw-filepath JSR2
-	;draw-position JSR2
 	( bitpad )
-	;draw-bitpad JSR2
+	#08 #00
+	&loop
+		( highlight ) DUP 4/ .selection/nibble LDZ = .selection/mode LDZ + STH
+		( state ) DUP #07 SWP - [ .selection/from LDZ2 LDA ] SWP SFT 2MOD STH
+		( y ) DUP 4/ TOS 8** .menu-frame/y LDZ2 ++ STH2
+		( x ) DUP 4MOD TOS 8** .menu-frame/x LDZ2 ++
+		STH2r STHr #01 STHr + ,draw-bit JSR
+		INC GTHk ,&loop JCN
+	POP2
+
 	( controls )
 	.menu-frame/x LDZ2 #0028 ++ .Screen/x DEO2
 	.menu-frame/y LDZ2 .Screen/y DEO2
+
 	AUTO-YADDR
 	LIT '+ #01 ;draw-char JSR2
 	LIT '- #01 ;draw-char JSR2
 	LIT '< #01 ;draw-char JSR2
 	LIT '> #01 ;draw-char JSR2
+
 	.menu-frame/x2 LDZ2 #0020 -- .Screen/x DEO2
 	;font/make #01 ;draw-sprite JSR2
 	;font/load #01 ;draw-sprite JSR2
 	.Screen/x DEI2k #0008 ++ ROT DEO2
 	;font/save #01 .state/changed LDZ + ;draw-sprite JSR2
+
 	AUTO-NONE
-
-RTN
-
-@draw-bitpad ( -- )
-
-	#08 #00
-	&loop
-		( state ) DUP #07 SWP - [ .selection/from LDZ2 LDA ] SWP SFT 2MOD STH
-		( y ) DUP 4/ TOS 8** .menu-frame/y LDZ2 ++ STH2
-		( x ) DUP 4MOD TOS 8** .menu-frame/x LDZ2 ++
-		STH2r STHr #01 ,draw-bit JSR
-		INC GTHk ,&loop JCN
-	POP2
 
 RTN
 
@@ -896,12 +870,13 @@ JMP2r
 @new-file ( -- )
 
 	( clear )
-	;data #0000 OVR2 -- ;mclr JSR2
+	;data #ffff OVR2 -- ;mclr JSR2
 	;data ;select JSR2
 	#00 ;draw-filepath JSR2
 	( rename to untitled.txt )
 	;path/name #0020 ;mclr JSR2
 	;untitled-txt ;path/name #000c ;mcpy JSR2
+	#01 ;draw-filepath JSR2
 	#0000 .selection/scroll STZ2
 	#0008 .length STZ2
 	#00 .state/changed STZ
@@ -913,7 +888,7 @@ RTN
 
 	( load bytes )
 	;path/name .File/name DEO2
-	;data #0000 OVR2 -- .File/length DEO2
+	#ffff ;data -- .File/length DEO2
 	;data .File/load DEO2
 	.File/success DEI2 #0001 MIN2 .length STZ2
 	#00 .state/changed STZ
@@ -1026,6 +1001,21 @@ RTN
 
 RTN
 
+@char-hex ( key -- value )
+
+	DUP #2f > OVR #3a < #0101 !! ,&no-num JCN
+		#30 - RTN
+		&no-num
+	DUP #60 > OVR #67 < #0101 !! ,&no-lc JCN
+		#57 - RTN ( #61 - #0a + )
+		&no-lc
+	DUP #40 > OVR #47 < #0101 !! ,&no-uc JCN
+		#37 - RTN ( #41 - #0a + )
+		&no-uc
+	POP #ff
+
+RTN
+
 @print-hex ( value* -- )
 	
 	SWP ,&byte JSR 
@@ -1035,6 +1025,15 @@ RTN
 	RTN
 	&parse ( byte -- char ) DUP #09 GTH ,&above JCN #30 + RTN 
 	&above #57 + RTN
+
+RTN
+
+@print-str ( string* -- )
+
+	#0001 SUB2 
+	&while
+		INC2 LDAk DUP #18 DEO ,&while JCN 
+	POP2
 
 RTN
 
