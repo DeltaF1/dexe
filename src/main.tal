@@ -549,14 +549,11 @@ RTN
 	DUP2 ;data .length LDZ2 ++ << ,&valid JCN
 		POP2 RTN
 		&valid
-
 	.selection/to STZ2
-
 	( clamp )
 	.selection/to LDZ2 .selection/from LDZ2 >> ,&not-before JCN
 		.selection/from LDZ2 .selection/to STZ2
 		&not-before
-
 	;follow-selection JSR2
 	;redraw JSR2
 
@@ -583,6 +580,7 @@ RTN
 		POP RTN
 		&changed
 	.selection/mode STZ
+	#00 .selection/nibble STZ
 	;draw-menu JSR2
 
 RTN
@@ -745,7 +743,7 @@ RTN
 	( bitpad )
 	#08 #00
 	&loop
-		( highlight ) DUP 4/ .selection/nibble LDZ = .selection/mode LDZ + STH
+		( highlight ) DUP 4/ .selection/nibble LDZ = .selection/mode LDZ ORA STH
 		( state ) DUP #07 SWP - [ .selection/from LDZ2 LDA ] SWP SFT 2MOD STH
 		( y ) DUP 4/ TOS 8** .menu-frame/y LDZ2 ++ STH2
 		( x ) DUP 4MOD TOS 8** .menu-frame/x LDZ2 ++
